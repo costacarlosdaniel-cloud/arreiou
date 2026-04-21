@@ -10804,9 +10804,9 @@ function _xlsxIPU(){
 
 function _xlsxLojas(){
   const h = ['ID','Nome','Centro','NIF','Município','Província','Morada','Tipo de Loja','Tipo de Via','Área (m²)','Abertura','Estado'];
-  const rows = (db.lojas||[]).map(s=>[
+  const rows = (STORES||[]).map(s=>[
     s.id||'', s.nome||'', s.centro||'', s.nif||'', s.municipio||'', s.provincia||'',
-    s.morada||'', s.tipo_loja||'', s.tipo_via||'', s.area||'', s.data_abertura||'', s.estado||''
+    s.morada||'', s.tipo_loja||'', s.tipo_via||'', s.area_total||'', s.data_abertura||'', s.estado||''
   ]);
   return [h, ...rows];
 }
@@ -10814,12 +10814,12 @@ function _xlsxLojas(){
 function _xlsxMaster(){
   const h = ['Loja','Centro','NIF','Município','Província','Morada','Tipo de Loja','Tipo de Via','Área (m²)','Abertura','Estado Loja',
     'Senhorio','Início Contrato','Fim Contrato','Renda Actual (Kz)','Periodicidade','Estado Contrato'];
-  const rows = (db.lojas||[]).map(s=>{
+  const rows = (STORES||[]).map(s=>{
     const c = db.contratos.find(x=>String(x.loja_id)===String(s.id) && x.estado==='ativo') ||
               db.contratos.find(x=>String(x.loja_id)===String(s.id));
     return [s.nome||'', s.centro||'', s.nif||'', s.municipio||'', s.provincia||'',
-      s.morada||'', s.tipo_loja||'', s.tipo_via||'', s.area||'', s.data_abertura||'', s.estado||'',
-      c?c.senhorio||'':'—', c?c.data_ini||'':'—', c?c.data_fim||'':'—',
+      s.morada||'', s.tipo_loja||'', s.tipo_via||'', s.area_total||'', s.data_abertura||'', s.estado||'',
+      c?c.senhorio||'':'—', c?c.data_inicio||'':'—', c?c.data_fim||'':'—',
       c?c.renda_atual||0:0, c?c.periodicidade||'':'—', c?c.estado||'':'—'];
   });
   return [h, ...rows];
