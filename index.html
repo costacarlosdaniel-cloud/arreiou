@@ -4855,7 +4855,25 @@ function updAlerts(){
 function toast(m, duration=2800){const t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('on');setTimeout(()=>t.classList.remove('on'),duration);}
 
 // - RENDER ALL -
+function _recalcStoreEstados(){
+  // Recalc estado for stores that don't have data from SalesKPIsStore
+  // A store has SalesKPIsStore data if it has venda_diaria > 0 OR data_abertura set
+  // We mark them with _inSalesKPIs during load; otherwise recalc from contracts
+  STORES.forEach(s => {
+    if(s._inSalesKPIs) return; // came from SalesKPIsStore — trust that estado
+    const ctr = db.contratos.find(c => String(c.loja_id) === String(s.id));
+    if(ctr) {
+      const est = (ctr.estado||'').toLowerCase();
+      const terminado = est === 'terminado' || est === 'rescindido';
+      s.estado = terminado ? 'Fechada definitivamente' : 'Abre brevemente';
+    } else {
+      if(!s.estado || s.estado === 'Aberta') s.estado = 'Abre brevemente';
+    }
+  });
+}
+
 function renderAll(){
+  _recalcStoreEstados();
   applyDueEscalacoes();
   saveDB();
   renderDashboard();
@@ -4931,6 +4949,7 @@ function init(){
   loadSalesHistory();  // restore from previous session
   loadDowntimeData();  // restore from previous session
   loadStores();        // restore STORES from previous session
+  _recalcStoreEstados(); // recalc estados based on current contracts
   loadMeioEnvolvente(); // restore Meio Envolvente data (or build fallback from STORES)
   applyDueEscalacoes();
   // Nota: saveDB() não é chamado aqui — Firebase vai sobrescrever com dados da nuvem
