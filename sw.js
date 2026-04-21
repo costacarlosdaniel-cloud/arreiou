@@ -1,7 +1,7 @@
 // ── Arreiou KPI — Service Worker ─────────────────────────────────────────────
 // Combina: cache de libs CDN (original) + suporte offline completo (novo)
 
-const CACHE_NAME = 'arreiou-kpi-v3';
+const CACHE_NAME = 'karta-v2';
 
 // Libs CDN a fazer cache — evita re-download e funciona offline
 const CACHEABLE_CDN = [
