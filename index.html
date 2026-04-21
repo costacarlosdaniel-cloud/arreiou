@@ -3037,18 +3037,9 @@ function handleUpload(event){
         if(!s._inSalesKPIs) {
           const ctr = db.contratos.find(c => String(c.loja_id) === String(s.id));
           if(ctr) {
-            const fim = ctr.data_fim||ctr.data_fim_contrato||'';
-            let terminado = false;
-            if(fim) {
-              const m1 = fim.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-              const m2 = fim.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-              let d;
-              if(m1) d = new Date(parseInt(m1[3]), parseInt(m1[2])-1, parseInt(m1[1]));
-              else if(m2) d = new Date(parseInt(m2[1]), parseInt(m2[2])-1, parseInt(m2[3]));
-              if(d && d < new Date()) terminado = true;
-            }
-            const ctrAtivo = ctr.estado && ctr.estado.toLowerCase().includes('ativ');
-            if(terminado || (!ctrAtivo && fim)) {
+            const est = (ctr.estado||'').toLowerCase();
+            const terminado = est === 'terminado' || est === 'rescindido';
+            if(terminado) {
               s.estado = 'Fechada definitivamente';
             } else {
               s.estado = 'Abre brevemente';
@@ -10200,18 +10191,9 @@ function gsParseKPIs(rows){
     const _resolveEstadoFallback = s => {
       const ctr = db.contratos.find(c => String(c.loja_id) === String(s.id));
       if(ctr) {
-        const fim = ctr.data_fim||ctr.data_fim_contrato||'';
-        let terminado = false;
-        if(fim) {
-          const m1 = fim.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-          const m2 = fim.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-          let d;
-          if(m1) d = new Date(parseInt(m1[3]), parseInt(m1[2])-1, parseInt(m1[1]));
-          else if(m2) d = new Date(parseInt(m2[1]), parseInt(m2[2])-1, parseInt(m2[3]));
-          if(d && d < new Date()) terminado = true;
-        }
-        const ctrAtivo = ctr.estado && ctr.estado.toLowerCase().includes('ativ');
-        return (terminado || (!ctrAtivo && fim)) ? 'Fechada definitivamente' : 'Abre brevemente';
+        const est = (ctr.estado||'').toLowerCase();
+        const terminado = est === 'terminado' || est === 'rescindido';
+        return terminado ? 'Fechada definitivamente' : 'Abre brevemente';
       }
       return 'Abre brevemente';
     };
@@ -10255,18 +10237,9 @@ function gsParseKPIs(rows){
       if(!centrosKPI.has(s.centro)) {
         const ctr = db.contratos.find(c => String(c.loja_id) === String(s.id));
         if(ctr) {
-          const fim = ctr.data_fim||ctr.data_fim_contrato||'';
-          let terminado = false;
-          if(fim) {
-            const m1 = fim.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-            const m2 = fim.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-            let d;
-            if(m1) d = new Date(parseInt(m1[3]), parseInt(m1[2])-1, parseInt(m1[1]));
-            else if(m2) d = new Date(parseInt(m2[1]), parseInt(m2[2])-1, parseInt(m2[3]));
-            if(d && d < new Date()) terminado = true;
-          }
-          const ctrAtivo = ctr.estado && ctr.estado.toLowerCase().includes('ativ');
-          s.estado = (terminado || (!ctrAtivo && fim)) ? 'Fechada definitivamente' : 'Abre brevemente';
+          const est = (ctr.estado||'').toLowerCase();
+          const terminado = est === 'terminado' || est === 'rescindido';
+          s.estado = terminado ? 'Fechada definitivamente' : 'Abre brevemente';
         } else {
           s.estado = s.estado || 'Abre brevemente';
         }
