@@ -9226,13 +9226,13 @@ function renderExpansao(){
     '<div class="kpi-lbl">'+l+'</div><div class="kpi-n sm"'+(c?' style="color:'+c+'"':'')+'>'+v+'</div>'+
     '<div class="kpi-sub">'+s+'</div></div>';}
   kpiEl.innerHTML=
-    kpi('Total abertas',opened.length,active.length+' activas · '+closed.length+' fechadas','var(--accent)')+
+    kpi('Total abertas',active.length,opened.length+' históricas · '+closed.length+' fechadas','var(--accent)')+
     kpi('Aberturas '+curYear,thisY,(thisY>=lastY?'▲':'▼')+' vs '+lastY+' em '+(curYear-1),thisY>=lastY?'var(--green)':'var(--amber)')+
     kpi('Abre brevemente',brevemente.length,brevemente.length===1?'loja em preparação':'lojas em preparação','var(--amber)')+
     kpi('Ritmo médio',avgY+'/ano',Math.round(avgY/12*10)/10+'/mês')+
     kpi('Municípios',munN,'com lojas activas')+
     kpi('1ª abertura',anos[0],'até '+anos[anos.length-1]);
-  document.getElementById('exp-fonte').textContent=opened.length+' lojas · '+anos[0]+'–'+anos[anos.length-1];
+  document.getElementById('exp-fonte').textContent=active.length+' lojas abertas · '+opened.length+' históricas · '+anos[0]+'–'+anos[anos.length-1];
   // Chart 1: aberturas por mes stacked bar
   vdChart('exp-chart-mensal',{type:'bar',
     data:{labels:meses,datasets:anos.map(function(ano,i){return {label:String(ano),
