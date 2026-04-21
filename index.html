@@ -9211,7 +9211,8 @@ function renderExpansao(){
     return true;
   }).sort(function(a,b){return a._d.ano!==b._d.ano?a._d.ano-b._d.ano:a._d.mes-b._d.mes;});
   var closed=opened.filter(function(s){return s.estado&&s.estado.toLowerCase().indexOf('fechada')>=0;});
-  var active=opened.filter(function(s){return s.estado==='Aberta';});
+  // active = todas as lojas com estado Aberta (independente de ter data_abertura)
+  var active=STORES.filter(function(s){return s.estado==='Aberta';});
   var brevemente=STORES.filter(function(s){return s.estado==='Abre brevemente';});
   var kpiEl=document.getElementById('exp-kpis');
   if(!opened.length){kpiEl.innerHTML='<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--ink3)">Sem datas de abertura</div>';return;}
