@@ -4563,6 +4563,7 @@ function showCalDay(d,y,m){
 
 // - LOJAS -
 function renderLojas(){
+  _recalcStoreEstados(); // garantir estados actualizados
   const sel=document.getElementById('f-lj-muni');
   if(sel.options.length<=1){[...new Set(STORES.map(s=>s.municipio).filter(Boolean))].sort().forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});}
   const q=g('s-lj').toLowerCase(),fm=g('f-lj-muni'),fe=g('f-lj-est');
@@ -9184,6 +9185,7 @@ function exportRendasXLSX(){
 // -
 // ====== EXPANSAO PAGE ======
 function renderExpansao(){
+  _recalcStoreEstados(); // garantir estados actualizados antes de contar
   function _pDex(d){
     if(!d) return null;
     var s=String(d);
