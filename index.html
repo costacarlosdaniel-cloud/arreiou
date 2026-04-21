@@ -9200,9 +9200,17 @@ function renderExpansao(){
   }
   var mLbl=['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   var meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  var opened=STORES.map(function(s){return Object.assign({},s,{_d:_pDex(s.data_abertura)});}).filter(function(s){return s._d;}).sort(function(a,b){return a._d.ano!==b._d.ano?a._d.ano-b._d.ano:a._d.mes-b._d.mes;});
+  var opened=STORES.map(function(s){return Object.assign({},s,{_d:_pDex(s.data_abertura)});}).filter(function(s){
+    // Só contar lojas que já abriram (com data_abertura e estado Aberta ou Fechada)
+    // Excluir "Abre brevemente" pois ainda não abriram
+    if(!s._d) return false;
+    var est=(s.estado||'').toLowerCase();
+    if(est.indexOf('brevemente')>=0) return false; // ainda não abriu
+    return true;
+  }).sort(function(a,b){return a._d.ano!==b._d.ano?a._d.ano-b._d.ano:a._d.mes-b._d.mes;});
   var closed=opened.filter(function(s){return s.estado&&s.estado.toLowerCase().indexOf('fechada')>=0;});
-  var active=opened.filter(function(s){return !s.estado||s.estado.toLowerCase().indexOf('fechada')<0;});
+  var active=opened.filter(function(s){return s.estado==='Aberta';});
+  var brevemente=STORES.filter(function(s){return s.estado==='Abre brevemente';});
   var kpiEl=document.getElementById('exp-kpis');
   if(!opened.length){kpiEl.innerHTML='<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--ink3)">Sem datas de abertura</div>';return;}
   var anos=[...new Set(opened.map(function(s){return s._d.ano;}))].sort(function(a,b){return a-b;});
@@ -9218,6 +9226,7 @@ function renderExpansao(){
   kpiEl.innerHTML=
     kpi('Total abertas',opened.length,active.length+' activas · '+closed.length+' fechadas','var(--accent)')+
     kpi('Aberturas '+curYear,thisY,(thisY>=lastY?'▲':'▼')+' vs '+lastY+' em '+(curYear-1),thisY>=lastY?'var(--green)':'var(--amber)')+
+    kpi('Abre brevemente',brevemente.length,brevemente.length===1?'loja em preparação':'lojas em preparação','var(--amber)')+
     kpi('Ritmo médio',avgY+'/ano',Math.round(avgY/12*10)/10+'/mês')+
     kpi('Municípios',munN,'com lojas activas')+
     kpi('1ª abertura',anos[0],'até '+anos[anos.length-1]);
