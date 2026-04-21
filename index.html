@@ -4856,11 +4856,14 @@ function toast(m, duration=2800){const t=document.getElementById('toast');if(!t)
 
 // - RENDER ALL -
 function _recalcStoreEstados(){
-  // Recalc estado for stores that don't have data from SalesKPIsStore
-  // A store has SalesKPIsStore data if it has venda_diaria > 0 OR data_abertura set
-  // We mark them with _inSalesKPIs during load; otherwise recalc from contracts
+  // Regras:
+  // 1. Se _inSalesKPIs=true → a KPI sheet definiu o estado explicitamente → não tocar
+  // 2. Se _inSalesKPIs=false ou undefined → calcular a partir do contrato:
+  //    - contrato terminado/rescindido → 'Fechada definitivamente'
+  //    - contrato ativo/pendente/outro → 'Abre brevemente'
+  //    - sem contrato → 'Abre brevemente'
   STORES.forEach(s => {
-    if(s._inSalesKPIs) return; // came from SalesKPIsStore — trust that estado
+    if(s._inSalesKPIs === true) return; // estado definido pela KPI sheet — não alterar
     const ctr = db.contratos.find(c => String(c.loja_id) === String(s.id));
     if(ctr) {
       const est = (ctr.estado||'').toLowerCase();
@@ -10226,12 +10229,14 @@ function gsParseKPIs(rows){
       }
       const info = storeInfo[s.centro];
       if(info) {
+        s._inSalesKPIs = true;
         if(info.data_abertura) s.data_abertura = info.data_abertura;
         if(info.estado)        s.estado        = info.estado === 'Aberta' ? 'Aberta' : info.estado;
         else                   s.estado        = _resolveEstadoFallback(s);
         if(info.gv)            s.gv            = info.gv;
         if(info.supervisor)    s.supervisor    = info.supervisor;
       } else {
+        s._inSalesKPIs = false;
         s.estado = _resolveEstadoFallback(s);
       }
     });
@@ -10250,10 +10255,13 @@ function gsParseKPIs(rows){
       const est = col(r,['dim lojas[loja aberta ?]','loja aberta ?','estado']).toString().trim();
       if(est) s.estado = est;
     });
-    // Apply fallback for stores not in the KPI sheet
+    // Mark _inSalesKPIs and apply fallback for stores not in the KPI sheet
     const centrosKPI = new Set(rows.slice(1).map(r => col(r,['dim lojas[nro centro (#)]','[nro centro (#)]','nro centro (#)','centro']).toString().trim()).filter(Boolean));
     STORES.forEach(s => {
-      if(!centrosKPI.has(s.centro)) {
+      if(centrosKPI.has(s.centro)) {
+        s._inSalesKPIs = true;
+      } else {
+        s._inSalesKPIs = false;
         const ctr = db.contratos.find(c => String(c.loja_id) === String(s.id));
         if(ctr) {
           const est = (ctr.estado||'').toLowerCase();
