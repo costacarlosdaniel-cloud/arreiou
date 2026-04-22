@@ -4,19 +4,21 @@
   "description": "Retail Intelligence — KPIs, análises e operações em tempo real",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#0A0A0F",
   "theme_color": "#0070F3",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%230A0A0F'/%3E%3Crect x='36' y='36' width='50' height='50' rx='11' fill='white'/%3E%3Crect x='36' y='106' width='50' height='50' rx='11' fill='%230070F3'/%3E%3Crect x='106' y='36' width='50' height='50' rx='11' fill='%230070F3' opacity='.6'/%3E%3Crect x='106' y='106' width='50' height='50' rx='11' fill='white'/%3E%3C/svg%3E",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='110' fill='%230A0A0F'/%3E%3Crect x='96' y='96' width='134' height='134' rx='28' fill='white'/%3E%3Crect x='96' y='282' width='134' height='134' rx='28' fill='%230070F3'/%3E%3Crect x='282' y='96' width='134' height='134' rx='28' fill='%230070F3' opacity='.6'/%3E%3Crect x='282' y='282' width='134' height='134' rx='28' fill='white'/%3E%3C/svg%3E",
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
