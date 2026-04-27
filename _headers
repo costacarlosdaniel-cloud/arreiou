@@ -7,5 +7,9 @@
   Cache-Control: no-cache
 
 /*
+  X-Robots-Tag: noindex, nofollow, noarchive
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Cache-Control: no-store
