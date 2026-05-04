@@ -1,63 +1,92 @@
-// ── Karta · Service Worker v2 ────────────────────────────────────────────
-const CACHE = 'karta-v2';
+// ── Arreiou KPI — Service Worker ─────────────────────────────────────────────
+// Combina: cache de libs CDN (original) + suporte offline completo (novo)
 
-const PRECACHE = [
+const CACHE_NAME = 'karta-v4';
+
+// Libs CDN a fazer cache — evita re-download e funciona offline
+const CACHEABLE_CDN = [
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
-  'https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+  'https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600&display=swap',
 ];
 
-self.addEventListener('install', e => {
+self.addEventListener('install', function(e) {
   self.skipWaiting();
   e.waitUntil(
-    caches.open(CACHE).then(c =>
-      Promise.all([
-        c.add('/index.html').catch(()=>{}),
-        c.addAll(PRECACHE).catch(()=>{})
-      ])
-    )
+    caches.open(CACHE_NAME).then(function(cache) {
+      return Promise.all([
+        cache.add('/index.html').catch(function() {}),
+        cache.addAll(CACHEABLE_CDN).catch(function() {})
+      ]);
+    })
   );
 });
 
-self.addEventListener('activate', e => {
+self.addEventListener('activate', function(e) {
   e.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))
-      .then(() => self.clients.claim())
+    caches.keys().then(function(keys) {
+      return Promise.all(
+        keys.filter(function(k) { return k !== CACHE_NAME; })
+            .map(function(k) { return caches.delete(k); })
+      );
+    }).then(function() { return self.clients.claim(); })
   );
 });
 
-self.addEventListener('fetch', e => {
-  const { method, url } = e.request;
-  if (method !== 'GET') return;
-  if (url.includes('firebaseio.com'))    return;
-  if (url.includes('firestore.googleapis.com')) return;
-  if (url.includes('gstatic.com/firebasejs')) return;
-  if (url.includes('googleapis.com/identitytoolkit')) return;
+self.addEventListener('fetch', function(e) {
+  var url = e.request.url;
+  var method = e.request.method;
 
-  // index.html — network first, cache fallback
-  if (e.request.mode === 'navigate' || url.endsWith('/') || url.endsWith('/index.html')) {
+  if (method !== 'GET' ||
+      url.includes('firebaseio.com') ||
+      url.includes('googleapis.com/spreadsheets') ||
+      url.includes('docs.google.com') ||
+      url.includes('gstatic.com/firebasejs') ||
+      url.includes('anthropic.com')) {
+    return;
+  }
+
+  // index.html: network-first, fallback cache offline
+  if (url.endsWith('/') || url.endsWith('/index.html') || e.request.mode === 'navigate') {
     e.respondWith(
       fetch(e.request, { cache: 'no-store' })
-        .then(r => { caches.open(CACHE).then(c=>c.put(e.request,r.clone())); return r; })
-        .catch(() => caches.match('/index.html'))
+        .then(function(r) {
+          var clone = r.clone();
+          caches.open(CACHE_NAME).then(function(c) { c.put(e.request, clone); });
+          return r;
+        })
+        .catch(function() { return caches.match('/index.html'); })
     );
     return;
   }
 
-  // CDN / fonts — cache first
-  if (url.includes('cdnjs.cloudflare.com') || url.includes('fonts.g')) {
+  // Libs CDN: cache-first
+  if (url.includes('cdnjs.cloudflare.com') ||
+      url.includes('fonts.googleapis.com') ||
+      url.includes('fonts.gstatic.com')) {
     e.respondWith(
-      caches.match(e.request).then(cached => {
+      caches.match(e.request).then(function(cached) {
         if (cached) return cached;
-        return fetch(e.request).then(r => {
-          if (r && r.status === 200) caches.open(CACHE).then(c=>c.put(e.request,r.clone()));
+        return fetch(e.request).then(function(r) {
+          if (r && r.status === 200) {
+            var clone = r.clone();
+            caches.open(CACHE_NAME).then(function(c) { c.put(e.request, clone); });
+          }
           return r;
-        }).catch(() => cached);
+        }).catch(function() { return cached; });
       })
     );
     return;
   }
 
-  // Default — network, no cache
-  e.respondWith(fetch(e.request, { cache: 'no-store' }).catch(() => caches.match(e.request)));
+  // Tudo o resto
+  e.respondWith(
+    fetch(e.request, { cache: 'no-store' }).catch(function() {
+      return caches.match(e.request);
+    })
+  );
+});
+
+self.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
