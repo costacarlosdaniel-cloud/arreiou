@@ -1,5 +1,5 @@
 // ── Karta · Service Worker v2.1 ─────────────────────────────────────────────
-const CACHE = 'karta-v2';
+const CACHE = 'karta-v3-sync-fix';
 
 const PRECACHE = [
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
