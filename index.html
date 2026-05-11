@@ -1,356 +1,607 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nexus Ops · Store Hygiene</title>
+<title>OpsClean · Gestão de Higiene</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
-:root {
-  --c0:#ffffff;--c1:#f8f7f5;--c2:#edebe6;--c3:#d9d5cc;
-  --c4:#a09890;--c5:#5a5550;--c6:#2a2622;--c7:#0f0e0c;
-  --acc:#c49a3c;--acc2:#1a4a3a;--acc3:#2d6a8a;
-  --err:#8b2020;--ok:#1a5c3a;
-  --r4:4px;--r8:8px;--r12:12px;
-  --sh:0 1px 3px rgba(15,14,12,.06),0 4px 12px rgba(15,14,12,.08);
-  --sh2:0 2px 8px rgba(15,14,12,.08),0 12px 32px rgba(15,14,12,.12);
-  --tr:.18s ease;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 13px; }
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: #F2F0EC;
+  color: #1A1916;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html{font-size:14px;}
-body{font-family:'Jost',sans-serif;background:var(--c1);color:var(--c6);min-height:100vh;line-height:1.55;-webkit-font-smoothing:antialiased;}
 
-/* BOOT */
-#boot{position:fixed;inset:0;z-index:9000;background:var(--c7);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .6s ease;}
-#boot.out{opacity:0;pointer-events:none;}
-.boot-wordmark{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:600;color:var(--c0);letter-spacing:2px;margin-bottom:6px;}
-.boot-sub{font-size:10px;font-weight:400;letter-spacing:4px;text-transform:uppercase;color:var(--c4);margin-bottom:40px;}
-.boot-bar{width:180px;height:1px;background:var(--c5);position:relative;overflow:hidden;}
-.boot-bar::after{content:'';position:absolute;left:-100%;top:0;width:100%;height:100%;background:var(--acc);animation:bootBar 1.6s ease infinite;}
-@keyframes bootBar{to{left:100%;}}
-.boot-msg{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--c5);margin-top:20px;}
+/* ── BOOT ── */
+#boot {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #0E0D0B;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 28px;
+  transition: opacity .5s ease .1s;
+}
+#boot.hide { opacity: 0; pointer-events: none; }
+.boot-logo {
+  font-family: 'Instrument Serif', serif;
+  font-size: 40px; color: #fff; letter-spacing: -.5px;
+}
+.boot-logo em { color: #C8A85C; font-style: italic; }
+.boot-line { width: 160px; height: 1px; background: #2A2924; position: relative; overflow: hidden; }
+.boot-line::after {
+  content: ''; position: absolute; inset: 0; width: 60%;
+  background: linear-gradient(90deg, transparent, #C8A85C, transparent);
+  animation: sweep 1.4s ease-in-out infinite;
+}
+@keyframes sweep { from{transform:translateX(-100%)} to{transform:translateX(266%)} }
+.boot-status { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #4A4840; }
 
-/* LAYOUT */
-.layout{display:flex;min-height:100vh;}
-.sidebar{width:220px;flex-shrink:0;background:var(--c7);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;border-right:1px solid rgba(255,255,255,.04);}
-.sidebar-logo{padding:32px 24px 28px;border-bottom:1px solid rgba(255,255,255,.06);}
-.s-wordmark{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--c0);letter-spacing:1px;}
-.s-sub{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--c4);margin-top:3px;}
-.sidebar-nav{flex:1;padding:20px 0;}
-.nav-sec{font-size:9px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--c5);padding:0 24px;margin:16px 0 8px;}
-.nv{display:flex;align-items:center;gap:12px;padding:10px 24px;font-size:13px;font-weight:400;color:var(--c4);cursor:pointer;border:none;background:none;width:100%;text-align:left;transition:color var(--tr),background var(--tr);font-family:'Jost',sans-serif;letter-spacing:.2px;position:relative;}
-.nv:hover{color:var(--c0);background:rgba(255,255,255,.04);}
-.nv.on{color:var(--c0);background:rgba(196,154,60,.1);}
-.nv.on::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--acc);}
-.nv-ico{font-size:15px;opacity:.7;}
-.nv.on .nv-ico{opacity:1;}
-.sidebar-footer{padding:20px 24px;border-top:1px solid rgba(255,255,255,.06);}
-.sync-row{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--c5);}
-.sdot{width:6px;height:6px;border-radius:50%;background:#4caf87;flex-shrink:0;}
-.sdot.spin{background:var(--acc);animation:blink .8s ease infinite;}
-.sdot.err{background:#e57373;animation:none;}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+/* ── LAYOUT ── */
+.app { display: flex; min-height: 100vh; }
 
-/* MAIN */
-.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;}
-.topbar{background:var(--c0);border-bottom:1px solid var(--c2);padding:0 40px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
-.crumb{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--c4);}
-.crumb strong{color:var(--acc);font-weight:500;}
-.content{padding:36px 40px 64px;}
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 234px; flex-shrink: 0;
+  background: #0E0D0B;
+  display: flex; flex-direction: column;
+  position: fixed; top: 0; left: 0; bottom: 0;
+  z-index: 200;
+}
+.sb-head {
+  padding: 28px 22px 24px;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.sb-logo {
+  font-family: 'Instrument Serif', serif;
+  font-size: 20px; color: #fff; letter-spacing: -.2px;
+  display: flex; align-items: center; gap: 10px;
+}
+.sb-logo-mark {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: #C8A85C;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: #0E0D0B; font-weight: 700;
+}
+.sb-tagline {
+  font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: #3A3830; margin-top: 14px; padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,.04);
+}
+.sb-nav { flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; }
+.sb-section { font-size: 9px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: #2E2C28; padding: 12px 10px 6px; }
+.nb {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 8px;
+  font-size: 13px; font-weight: 400; color: #5A5750;
+  cursor: pointer; border: none; background: none;
+  width: 100%; text-align: left;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  transition: color .15s, background .15s;
+  position: relative;
+}
+.nb i { font-size: 16px; color: #3A3830; transition: color .15s; }
+.nb:hover { color: #C8C8C0; background: rgba(255,255,255,.04); }
+.nb:hover i { color: #C8C8C0; }
+.nb.on { color: #fff; background: rgba(200,168,92,.12); }
+.nb.on i { color: #C8A85C; }
+.nb.on::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 20px; background: #C8A85C; border-radius: 0 3px 3px 0; }
+.sb-footer {
+  padding: 16px 12px 20px;
+  border-top: 1px solid rgba(255,255,255,.05);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.sync-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: #3A3830;
+  padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+}
+.sdot { width: 5px; height: 5px; border-radius: 50%; background: #4CAF87; flex-shrink: 0; }
+.sdot.spin { background: #C8A85C; animation: blink .7s ease infinite; }
+.sdot.err  { background: #E57373; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+.sb-refresh {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px; border-radius: 7px; font-size: 11px; font-weight: 500;
+  color: #3A3830; border: 1px solid rgba(255,255,255,.07);
+  background: none; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif;
+  transition: color .15s, border-color .15s;
+  letter-spacing: .3px;
+}
+.sb-refresh:hover { color: #C8C8C0; border-color: rgba(255,255,255,.15); }
 
-/* PAGES */
-.page{display:none;}
-.page.on{display:block;animation:pIn .28s ease both;}
-@keyframes pIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* ── MAIN ── */
+.main { margin-left: 234px; flex: 1; display: flex; flex-direction: column; }
 
-/* PAGE HEADER */
-.ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid var(--c2);}
-.ph h1{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:600;color:var(--c7);letter-spacing:-.3px;line-height:1.1;}
-.ph p{font-size:13px;color:var(--c4);margin-top:5px;font-weight:300;}
-.ph-ctrl{display:flex;gap:10px;align-items:flex-end;}
+/* ── TOPBAR ── */
+.topbar {
+  height: 54px; background: #F2F0EC;
+  border-bottom: 1px solid #E4E1DA;
+  padding: 0 36px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+}
+.tb-crumb { display: flex; align-items: center; gap: 8px; }
+.tb-crumb-base { font-size: 12px; color: #9A9388; letter-spacing: .2px; }
+.tb-crumb-sep { font-size: 14px; color: #D0CCC4; }
+.tb-crumb-cur { font-size: 13px; font-weight: 600; color: #1A1916; }
+.tb-right { display: flex; align-items: center; gap: 14px; }
+.gv-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: #1A1916; border-radius: 100px;
+  padding: 5px 12px 5px 8px;
+  font-size: 11px; color: #C8A85C; font-weight: 500; letter-spacing: .2px;
+}
+.gv-dot { width: 6px; height: 6px; border-radius: 50%; background: #C8A85C; }
 
-/* BUTTONS */
-.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:var(--r8);font-size:12px;font-weight:500;letter-spacing:.3px;font-family:'Jost',sans-serif;cursor:pointer;border:none;transition:all var(--tr);}
-.btn-ghost{background:transparent;color:var(--c5);border:1px solid var(--c3);}
-.btn-ghost:hover{border-color:var(--c5);color:var(--c6);}
-.btn-dark{background:var(--c7);color:var(--c0);}
-.btn-dark:hover{background:var(--c6);}
-.btn-gold{background:var(--acc);color:var(--c0);}
-.btn-gold:hover{background:#b08830;}
-.btn-sm{padding:6px 12px;font-size:11px;}
-.btn-del{background:#fbe9e9;color:var(--err);border:1px solid #f5c6c6;}
-.btn-del:hover{background:#f8d0d0;}
+/* ── CONTENT ── */
+.content { padding: 32px 36px 80px; }
 
-/* FORMS */
-.fg{margin-bottom:16px;}
-.fl{display:block;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--c4);margin-bottom:7px;}
-select,input[type=text],input[type=date],textarea{width:100%;background:var(--c1);border:1px solid var(--c3);border-radius:var(--r8);padding:10px 13px;font-family:'Jost',sans-serif;font-size:13px;color:var(--c6);outline:none;transition:border-color var(--tr),box-shadow var(--tr);-webkit-appearance:none;}
-select:focus,input:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(196,154,60,.1);}
+/* ── PAGES ── */
+.page { display: none; }
+.page.on { display: block; animation: pgIn .25s cubic-bezier(.22,.68,0,1.2) both; }
+@keyframes pgIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
 
-/* KPIs */
-.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;}
-.kpi{background:var(--c0);border:1px solid var(--c2);border-radius:var(--r12);padding:22px 24px;box-shadow:var(--sh);position:relative;overflow:hidden;}
-.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--acc) 0%,transparent 100%);}
-.kpi-lbl{font-size:9px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--c4);margin-bottom:10px;}
-.kpi-val{font-family:'Cormorant Garamond',serif;font-size:38px;font-weight:700;color:var(--c7);line-height:1;}
-.kpi-val.ld{color:var(--c3);}
-.kpi-sub{font-size:11px;color:var(--c4);margin-top:7px;font-weight:300;}
+/* ── PAGE HEADER ── */
+.ph {
+  display: flex; align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  gap: 20px;
+}
+.ph-l h1 {
+  font-family: 'Instrument Serif', serif;
+  font-size: 32px; font-weight: 400; color: #0E0D0B;
+  letter-spacing: -.4px; line-height: 1.1;
+}
+.ph-l h1 em { font-style: italic; color: #C8A85C; }
+.ph-l p { font-size: 13px; color: #9A9388; margin-top: 5px; font-weight: 400; }
+.ph-r { display: flex; align-items: flex-end; gap: 10px; flex-shrink: 0; }
 
-/* CARDS */
-.card{background:var(--c0);border:1px solid var(--c2);border-radius:var(--r12);box-shadow:var(--sh);overflow:hidden;}
-.card-hd{padding:15px 22px;border-bottom:1px solid var(--c2);display:flex;align-items:center;justify-content:space-between;}
-.card-ttl{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--c4);}
-.card-bd{padding:22px;}
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border-radius: 9px;
+  font-size: 12px; font-weight: 600; letter-spacing: .2px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  cursor: pointer; border: none; transition: all .15s;
+}
+.btn i { font-size: 15px; }
+.btn-primary { background: #1A1916; color: #F2F0EC; }
+.btn-primary:hover { background: #2E2C28; }
+.btn-accent { background: #C8A85C; color: #0E0D0B; }
+.btn-accent:hover { background: #B8982C; }
+.btn-outline {
+  background: transparent; color: #5A5750;
+  border: 1px solid #D4D0C8;
+}
+.btn-outline:hover { border-color: #9A9388; color: #1A1916; }
+.btn-ghost { background: transparent; color: #9A9388; }
+.btn-ghost:hover { color: #1A1916; background: #E8E4DC; }
+.btn-sm { padding: 6px 12px; font-size: 11px; }
+.btn-danger { background: #FBE9E9; color: #8B2020; border: 1px solid #F0C0C0; }
+.btn-danger:hover { background: #F8D4D4; }
 
-/* BADGES */
-.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600;letter-spacing:.2px;}
-.bd-gold{background:#fef7e6;color:var(--acc);}
-.bd-teal{background:#e4f2ee;color:var(--acc2);}
-.bd-stone{background:var(--c2);color:var(--c5);}
-.bd-op1{background:#e8f0fe;color:#1a56cc;}
-.bd-op2{background:#e6f4ea;color:#137333;}
+/* ── FORMS ── */
+.fg { margin-bottom: 14px; }
+.fg:last-child { margin-bottom: 0; }
+.fl {
+  display: block; font-size: 10px; font-weight: 700;
+  letter-spacing: 1.2px; text-transform: uppercase;
+  color: #9A9388; margin-bottom: 6px;
+}
+select, input[type=text], input[type=date], textarea {
+  width: 100%; background: #fff;
+  border: 1px solid #E4E1DA; border-radius: 8px;
+  padding: 9px 12px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px; color: #1A1916; outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  -webkit-appearance: none; appearance: none;
+}
+select:focus, input:focus, textarea:focus {
+  border-color: #C8A85C;
+  box-shadow: 0 0 0 3px rgba(200,168,92,.15);
+}
 
-/* SUPERVISOR CARDS */
-.sup-row{background:var(--c0);border:1px solid var(--c2);border-radius:var(--r12);margin-bottom:10px;box-shadow:var(--sh);overflow:hidden;transition:box-shadow var(--tr);}
-.sup-row:hover{box-shadow:var(--sh2);}
-.sup-hd{background:var(--c1);padding:14px 22px;border-bottom:1px solid var(--c2);display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.sup-name{font-size:14px;font-weight:500;color:var(--c7);letter-spacing:-.1px;}
-.sup-stores{font-size:11px;color:var(--c4);margin-top:3px;font-weight:300;}
-.sup-bd{padding:16px 22px;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+/* ── KPI CARDS ── */
+.kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 28px; }
+.kpi-card {
+  background: #fff;
+  border: 1px solid #E8E4DC;
+  border-radius: 14px;
+  padding: 20px 22px;
+  position: relative; overflow: hidden;
+}
+.kpi-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: #C8A85C;
+}
+.kpi-lbl { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #9A9388; margin-bottom: 10px; }
+.kpi-val {
+  font-family: 'Instrument Serif', serif;
+  font-size: 40px; font-weight: 400; color: #0E0D0B; line-height: 1;
+}
+.kpi-val.ld { color: #D4D0C8; font-size: 32px; }
+.kpi-sub { font-size: 11px; color: #B4B0A8; margin-top: 6px; }
 
-/* TABLE */
-.tw{overflow-x:auto;}
-table{width:100%;border-collapse:collapse;font-size:13px;}
-thead tr{background:var(--c1);}
-th{text-align:left;padding:10px 16px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--c4);border-bottom:1px solid var(--c2);white-space:nowrap;}
-td{padding:13px 16px;border-bottom:1px solid var(--c2);vertical-align:middle;}
-tr:last-child td{border-bottom:none;}
-tbody tr{transition:background var(--tr);}
-tbody tr:hover td{background:var(--c1);}
+/* ── CARDS ── */
+.card {
+  background: #fff;
+  border: 1px solid #E8E4DC;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.card-hd {
+  padding: 14px 20px;
+  border-bottom: 1px solid #F0EDE6;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-ttl { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #9A9388; }
+.card-bd { padding: 20px; }
 
-/* SCHEDULE WEEK GROUPS */
-.wk-hd{display:flex;align-items:center;gap:14px;margin-bottom:10px;margin-top:28px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--c4);}
-.wk-hd::after{content:'';flex:1;height:1px;background:var(--c2);}
-.wk-hd:first-child{margin-top:0;}
-.chip{display:inline-flex;align-items:center;background:var(--c2);border-radius:var(--r4);padding:2px 8px;font-size:11px;font-weight:600;color:var(--c6);letter-spacing:.3px;}
+/* ── BADGES ── */
+.bdg {
+  display: inline-flex; align-items: center;
+  padding: 3px 10px; border-radius: 100px;
+  font-size: 11px; font-weight: 600; letter-spacing: .2px;
+}
+.bdg-gold { background: #FEF7E6; color: #8A6010; }
+.bdg-green { background: #E6F4EE; color: #1A5C3A; }
+.bdg-stone { background: #F0EDE6; color: #6A6660; }
+.bdg-blue  { background: #E8F0FE; color: #1A4AAA; }
+.bdg-teal  { background: #E4F2EE; color: #0F5A48; }
 
-/* CALENDAR */
-.cal-nav{display:flex;align-items:center;gap:16px;}
-.cal-lbl{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;min-width:200px;text-align:center;color:var(--c7);}
-.cg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
-.cdl{text-align:center;padding:8px 0;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--c4);}
-.cc{background:var(--c0);border:1px solid var(--c2);border-radius:var(--r8);min-height:90px;padding:9px 8px;cursor:pointer;transition:border-color var(--tr),box-shadow var(--tr);}
-.cc:hover{border-color:var(--acc);box-shadow:0 2px 10px rgba(196,154,60,.15);}
-.cc.dim{opacity:.28;pointer-events:none;}
-.cc.rest{background:var(--c1);}
-.cc.tdy{border-color:var(--acc);}
-.cn{font-size:12px;font-weight:600;color:var(--c4);margin-bottom:5px;}
-.pip{display:block;font-size:10px;border-radius:3px;padding:2px 6px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pv{background:#e8f0fe;color:#1a56cc;}
-.pr{background:#fbe9e9;color:var(--err);}
-.cal-dtl{background:var(--c0);border:1px solid var(--c2);border-radius:var(--r12);box-shadow:var(--sh2);margin-top:16px;display:none;animation:su .22s ease both;}
-.cal-dtl.open{display:block;}
-@keyframes su{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-.cd-hd{padding:16px 22px;border-bottom:1px solid var(--c2);display:flex;align-items:center;justify-content:space-between;}
-.cd-ttl{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--c7);}
-.cd-bd{padding:20px 22px;}
+/* ── SUPERVISOR CARDS ── */
+.sup-block {
+  background: #fff; border: 1px solid #E8E4DC;
+  border-radius: 14px; margin-bottom: 10px;
+  overflow: hidden; transition: box-shadow .15s;
+}
+.sup-block:hover { box-shadow: 0 4px 20px rgba(14,13,11,.07); }
+.sup-hd {
+  padding: 14px 20px;
+  background: #FAF8F4;
+  border-bottom: 1px solid #F0EDE6;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.sup-name { font-size: 14px; font-weight: 600; color: #1A1916; }
+.sup-sub { font-size: 11px; color: #9A9388; margin-top: 3px; }
+.sup-bd { padding: 16px 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
-/* TASKS */
-.ti{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--r8);border:1px solid var(--c2);margin-bottom:8px;background:var(--c1);transition:border-color var(--tr);}
-.ti:hover{border-color:var(--c3);}
-.ti-ico{font-size:17px;flex-shrink:0;}
-.ti-info{flex:1;}
-.ti-name{font-size:13px;font-weight:500;color:var(--c6);}
-.ti-meta{font-size:11px;color:var(--c4);margin-top:2px;}
+/* ── TABLE ── */
+.tw { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead tr { background: #FAF8F4; }
+th { text-align: left; padding: 10px 16px; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #9A9388; border-bottom: 1px solid #E8E4DC; white-space: nowrap; }
+td { padding: 12px 16px; border-bottom: 1px solid #F4F2EC; vertical-align: middle; color: #1A1916; }
+tr:last-child td { border-bottom: none; }
+tbody tr { transition: background .12s; }
+tbody tr:hover td { background: #FAF8F4; }
 
-/* CONFIG */
-.cfi{display:flex;align-items:center;justify-content:space-between;padding:15px 0;border-bottom:1px solid var(--c2);}
-.cfi:last-child{border-bottom:none;}
-.cfl{font-size:13px;font-weight:500;}
-.cfd{font-size:11px;color:var(--c4);margin-top:2px;font-weight:300;}
-.cfc{flex-shrink:0;margin-left:20px;}
-.cfc select{width:150px;}
+/* ── SCHEDULE WEEKS ── */
+.wk-sep { display: flex; align-items: center; gap: 12px; margin: 28px 0 10px; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #B4B0A8; }
+.wk-sep::after { content: ''; flex: 1; height: 1px; background: #E8E4DC; }
+.wk-sep:first-child { margin-top: 0; }
+.sid-chip { display: inline-flex; align-items: center; background: #F0EDE6; border-radius: 5px; padding: 2px 8px; font-size: 11px; font-weight: 700; color: #5A5750; letter-spacing: .3px; }
 
-/* EMPTY / ALERT */
-.empty{text-align:center;padding:60px 20px;}
-.ei{font-size:36px;margin-bottom:14px;opacity:.35;}
-.empty p{font-size:13px;color:var(--c4);font-weight:300;max-width:360px;margin:0 auto;}
-.alert-err{padding:13px 18px;border-radius:var(--r8);font-size:13px;margin-bottom:20px;background:#fbe9e9;border:1px solid #f5c6c6;color:var(--err);display:none;}
+/* ── CALENDAR ── */
+.cal-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.cal-month { font-family: 'Instrument Serif', serif; font-size: 24px; font-weight: 400; color: #0E0D0B; }
+.cal-nav-btns { display: flex; align-items: center; gap: 8px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
+.cal-day-label { text-align: center; padding: 8px 0; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #9A9388; }
+.cc {
+  background: #fff; border: 1px solid #E8E4DC;
+  border-radius: 10px; min-height: 88px;
+  padding: 9px 8px; cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.cc:hover { border-color: #C8A85C; box-shadow: 0 2px 12px rgba(200,168,92,.18); }
+.cc.dim { opacity: .25; pointer-events: none; }
+.cc.rest { background: #FAF8F4; }
+.cc.tdy { border-color: #C8A85C; }
+.cc-num { font-size: 12px; font-weight: 600; color: #B4B0A8; margin-bottom: 5px; }
+.cc.tdy .cc-num {
+  background: #C8A85C; color: #fff;
+  width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 11px;
+}
+.cpip { display: block; font-size: 10px; border-radius: 4px; padding: 2px 5px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cpip-v { background: #EBF0FE; color: #1A4AAA; }
+.cpip-r { background: #FBE9E9; color: #8B2020; }
 
-/* GRIDS */
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
-hr.dv{border:none;border-top:1px solid var(--c2);margin:20px 0;}
+/* ── CALENDAR DETAIL ── */
+.cal-dtl { background: #fff; border: 1px solid #E8E4DC; border-radius: 14px; margin-top: 16px; display: none; }
+.cal-dtl.open { display: block; animation: su .2s ease both; }
+@keyframes su { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+.cd-hd { padding: 16px 20px; border-bottom: 1px solid #F0EDE6; display: flex; align-items: center; justify-content: space-between; }
+.cd-ttl { font-family: 'Instrument Serif', serif; font-size: 18px; color: #0E0D0B; }
+.cd-bd { padding: 20px; }
 
-@media(max-width:900px){
-  .sidebar{display:none;}.main{margin-left:0;}.content{padding:20px 16px 60px;}
-  .kpi-strip{grid-template-columns:1fr 1fr;}.g2{grid-template-columns:1fr;}
-  .sup-bd{grid-template-columns:1fr;}.ph{flex-direction:column;align-items:flex-start;gap:16px;}
+/* ── TASK ITEMS ── */
+.task-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; border-radius: 9px;
+  border: 1px solid #E8E4DC; margin-bottom: 8px;
+  background: #FAF8F4; transition: border-color .15s;
+}
+.task-item:hover { border-color: #D4D0C8; }
+.ti-ico { font-size: 18px; color: #9A9388; flex-shrink: 0; }
+.ti-info { flex: 1; }
+.ti-name { font-size: 13px; font-weight: 500; color: #1A1916; }
+.ti-meta { font-size: 11px; color: #9A9388; margin-top: 2px; }
+
+/* ── CONFIG ROWS ── */
+.cfg-r { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid #F0EDE6; }
+.cfg-r:last-child { border-bottom: none; }
+.cfg-l { font-size: 13px; font-weight: 500; color: #1A1916; }
+.cfg-d { font-size: 11px; color: #9A9388; margin-top: 2px; }
+.cfg-c { flex-shrink: 0; margin-left: 20px; }
+.cfg-c select { width: 148px; }
+
+/* ── ERROR / ALERT ── */
+.alert-err { padding: 12px 16px; border-radius: 9px; font-size: 13px; margin-bottom: 20px; background: #FBE9E9; border: 1px solid #F0C0C0; color: #8B2020; display: none; line-height: 1.6; }
+
+/* ── EMPTY ── */
+.empty { text-align: center; padding: 60px 20px; }
+.empty i { font-size: 32px; color: #D4D0C8; margin-bottom: 14px; display: block; }
+.empty p { font-size: 13px; color: #9A9388; max-width: 340px; margin: 0 auto; line-height: 1.7; }
+
+/* ── GRIDS ── */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+hr.sep { border: none; border-top: 1px solid #E8E4DC; margin: 18px 0; }
+
+@media(max-width:900px) {
+  .sidebar { display: none; } .main { margin-left: 0; }
+  .content { padding: 20px 16px 60px; }
+  .kpi-row, .g2 { grid-template-columns: 1fr 1fr; }
+  .sup-bd { grid-template-columns: 1fr; }
+  .ph { flex-direction: column; align-items: flex-start; }
 }
 </style>
 </head>
 <body>
 
 <div id="boot">
-  <div class="boot-wordmark">Nexus Ops</div>
-  <div class="boot-sub">Store Hygiene Management</div>
-  <div class="boot-bar"></div>
-  <div class="boot-msg" id="boot-msg">Connecting to data source…</div>
+  <div class="boot-logo">Ops<em>Clean</em></div>
+  <div class="boot-line"></div>
+  <div class="boot-status" id="boot-msg">A ligar à fonte de dados…</div>
 </div>
 
-<div class="layout">
+<div class="app">
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="s-wordmark">Nexus Ops</div>
-      <div class="s-sub">Hygiene Management</div>
+    <div class="sb-head">
+      <div class="sb-logo">
+        <div class="sb-logo-mark">O</div>
+        OpsClean
+      </div>
+      <div class="sb-tagline">Gestão de Higiene · Lojas</div>
     </div>
-    <nav class="sidebar-nav">
-      <div class="nav-sec">Programme</div>
-      <button class="nv on" onclick="go('selection',this)"><span class="nv-ico">◈</span> Selection</button>
-      <button class="nv" onclick="go('schedule',this)"><span class="nv-ico">≡</span> Schedule</button>
-      <button class="nv" onclick="go('calendar',this)"><span class="nv-ico">⊡</span> Calendar</button>
-      <div class="nav-sec">System</div>
-      <button class="nv" onclick="go('admin',this)"><span class="nv-ico">⚙</span> Administration</button>
+    <nav class="sb-nav">
+      <div class="sb-section">Programa</div>
+      <button class="nb on" onclick="go('selecao',this)">
+        <i class="ti ti-users-group"></i> Seleção Mensal
+      </button>
+      <button class="nb" onclick="go('agenda',this)">
+        <i class="ti ti-list-details"></i> Agenda de Trabalhos
+      </button>
+      <button class="nb" onclick="go('calendario',this)">
+        <i class="ti ti-calendar-month"></i> Calendário
+      </button>
+      <div class="sb-section">Sistema</div>
+      <button class="nb" onclick="go('administracao',this)">
+        <i class="ti ti-settings-2"></i> Administração
+      </button>
     </nav>
-    <div class="sidebar-footer">
-      <div class="sync-row">
+    <div class="sb-footer">
+      <div class="sync-pill">
         <span class="sdot" id="sdot"></span>
-        <span id="stxt">Synced</span>
+        <span id="stxt">Sincronizado</span>
       </div>
-      <div style="margin-top:10px;">
-        <button class="btn btn-ghost btn-sm" style="color:var(--c4);border-color:rgba(255,255,255,.1);font-size:10px;width:100%;justify-content:center;" onclick="reload()">↻ Refresh data</button>
-      </div>
+      <button class="sb-refresh" onclick="recarregar()">
+        <i class="ti ti-refresh" style="font-size:14px;"></i> Atualizar dados
+      </button>
     </div>
   </aside>
 
   <div class="main">
     <header class="topbar">
-      <span class="crumb" id="crumb">Programme · <strong>Selection</strong></span>
-      <span style="font-size:11px;color:var(--c4);letter-spacing:.5px;">GV <strong style="color:var(--acc);">Carlos Daniel Almeida Costa</strong></span>
+      <div class="tb-crumb">
+        <span class="tb-crumb-base">OpsClean</span>
+        <span class="tb-crumb-sep">/</span>
+        <span class="tb-crumb-cur" id="crumb-cur">Seleção Mensal</span>
+      </div>
+      <div class="tb-right">
+        <div class="gv-pill">
+          <span class="gv-dot"></span>
+          GV Carlos Daniel Almeida Costa
+        </div>
+      </div>
     </header>
 
     <div class="content">
 
-      <!-- SELECTION -->
-      <div class="page on" id="page-selection">
+      <!-- ══════════ SELEÇÃO ══════════ -->
+      <div class="page on" id="page-selecao">
         <div class="ph">
-          <div>
-            <h1>Monthly Selection</h1>
-            <p>Assign an FT operator pair per supervisor for the cleaning programme.</p>
+          <div class="ph-l">
+            <h1>Seleção <em>Mensal</em></h1>
+            <p>Atribuir um par de operadores FT por supervisor para o programa de limpeza.</p>
           </div>
-          <div class="ph-ctrl">
+          <div class="ph-r">
             <div class="fg" style="margin:0;">
-              <label class="fl">Month</label>
-              <select id="sel-m" onchange="renderSel()" style="width:120px;">
-                <option value="0">January</option><option value="1">February</option>
-                <option value="2">March</option><option value="3">April</option>
-                <option value="4">May</option><option value="5">June</option>
-                <option value="6">July</option><option value="7">August</option>
-                <option value="8">September</option><option value="9">October</option>
-                <option value="10">November</option><option value="11">December</option>
+              <label class="fl">Mês</label>
+              <select id="sel-m" onchange="renderSel()" style="width:128px;">
+                <option value="0">Janeiro</option><option value="1">Fevereiro</option>
+                <option value="2">Março</option><option value="3">Abril</option>
+                <option value="4">Maio</option><option value="5">Junho</option>
+                <option value="6">Julho</option><option value="7">Agosto</option>
+                <option value="8">Setembro</option><option value="9">Outubro</option>
+                <option value="10">Novembro</option><option value="11">Dezembro</option>
               </select>
             </div>
             <div class="fg" style="margin:0;">
-              <label class="fl">Year</label>
-              <select id="sel-y" onchange="renderSel()" style="width:90px;">
+              <label class="fl">Ano</label>
+              <select id="sel-a" onchange="renderSel()" style="width:88px;">
                 <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
               </select>
             </div>
-            <div><button class="btn btn-gold" onclick="genSched()">⚡ Generate Schedule</button></div>
+            <button class="btn btn-accent" onclick="gerarAgenda()">
+              <i class="ti ti-bolt"></i> Gerar Agenda
+            </button>
           </div>
         </div>
+
         <div class="alert-err" id="sel-err"></div>
-        <div class="kpi-strip">
-          <div class="kpi"><div class="kpi-lbl">Stores · GV</div><div class="kpi-val ld" id="kv-s">—</div><div class="kpi-sub">Carlos Daniel A. Costa</div></div>
-          <div class="kpi"><div class="kpi-lbl">Supervisors</div><div class="kpi-val ld" id="kv-su">—</div><div class="kpi-sub">This cycle</div></div>
-          <div class="kpi"><div class="kpi-lbl">FT Operators</div><div class="kpi-val ld" id="kv-op">—</div><div class="kpi-sub">Eligible pool</div></div>
-          <div class="kpi"><div class="kpi-lbl">Pairs Assigned</div><div class="kpi-val" id="kv-pr">0</div><div class="kpi-sub" id="kv-pr-sub">of — supervisors</div></div>
+
+        <div class="kpi-row">
+          <div class="kpi-card"><div class="kpi-lbl">Lojas · GV</div><div class="kpi-val ld" id="kv-l">—</div><div class="kpi-sub">Carlos Daniel A. Costa</div></div>
+          <div class="kpi-card"><div class="kpi-lbl">Supervisores</div><div class="kpi-val ld" id="kv-s">—</div><div class="kpi-sub">Neste ciclo</div></div>
+          <div class="kpi-card"><div class="kpi-lbl">Operadores FT</div><div class="kpi-val ld" id="kv-o">—</div><div class="kpi-sub">Pool elegível</div></div>
+          <div class="kpi-card"><div class="kpi-lbl">Pares Atribuídos</div><div class="kpi-val" id="kv-p">0</div><div class="kpi-sub" id="kv-ps">de — supervisores</div></div>
         </div>
-        <div id="sup-list"></div>
+
+        <div id="sup-lista"></div>
       </div>
 
-      <!-- SCHEDULE -->
-      <div class="page" id="page-schedule">
+      <!-- ══════════ AGENDA ══════════ -->
+      <div class="page" id="page-agenda">
         <div class="ph">
-          <div><h1>Work Schedule</h1><p>Daily store assignments and team deployment.</p></div>
-          <div class="ph-ctrl">
-            <div class="fg" style="margin:0;"><label class="fl">Month</label>
-              <select id="ag-m" onchange="renderSched()" style="width:120px;">
-                <option value="0">January</option><option value="1">February</option><option value="2">March</option><option value="3">April</option><option value="4">May</option><option value="5">June</option><option value="6">July</option><option value="7">August</option><option value="8">September</option><option value="9">October</option><option value="10">November</option><option value="11">December</option>
+          <div class="ph-l">
+            <h1>Agenda de <em>Trabalhos</em></h1>
+            <p>Visitas diárias e distribuição das equipas por loja.</p>
+          </div>
+          <div class="ph-r">
+            <div class="fg" style="margin:0;">
+              <label class="fl">Mês</label>
+              <select id="ag-m" onchange="renderAgenda()" style="width:128px;">
+                <option value="0">Janeiro</option><option value="1">Fevereiro</option><option value="2">Março</option><option value="3">Abril</option><option value="4">Maio</option><option value="5">Junho</option><option value="6">Julho</option><option value="7">Agosto</option><option value="8">Setembro</option><option value="9">Outubro</option><option value="10">Novembro</option><option value="11">Dezembro</option>
               </select>
             </div>
-            <div class="fg" style="margin:0;"><label class="fl">Year</label>
-              <select id="ag-y" onchange="renderSched()" style="width:90px;"><option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option></select>
+            <div class="fg" style="margin:0;">
+              <label class="fl">Ano</label>
+              <select id="ag-a" onchange="renderAgenda()" style="width:88px;"><option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option></select>
             </div>
-            <div class="fg" style="margin:0;"><label class="fl">Search</label><input type="text" id="ag-q" placeholder="Store, operator…" oninput="renderSched()" style="width:190px;"></div>
+            <div class="fg" style="margin:0;">
+              <label class="fl">Pesquisar</label>
+              <input type="text" id="ag-q" placeholder="Loja ou operador…" oninput="renderAgenda()" style="width:190px;">
+            </div>
           </div>
         </div>
-        <div id="sched-out"></div>
+        <div id="agenda-out"></div>
       </div>
 
-      <!-- CALENDAR -->
-      <div class="page" id="page-calendar">
+      <!-- ══════════ CALENDÁRIO ══════════ -->
+      <div class="page" id="page-calendario">
         <div class="ph">
-          <div><h1>Calendar</h1><p>Monthly overview — click any day for detail.</p></div>
-          <div class="ph-ctrl">
-            <div class="cal-nav">
-              <button class="btn btn-ghost btn-sm" onclick="calShift(-1)">‹ Prev</button>
-              <span class="cal-lbl" id="cal-lbl"></span>
-              <button class="btn btn-ghost btn-sm" onclick="calShift(1)">Next ›</button>
-            </div>
-            <div style="display:flex;gap:14px;align-items:center;font-size:11px;color:var(--c4);">
-              <span style="display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:#1a56cc;display:inline-block;"></span>Visit</span>
-              <span style="display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--err);display:inline-block;"></span>Rest</span>
-            </div>
+          <div class="ph-l">
+            <h1><em>Calendário</em></h1>
+            <p>Vista mensal de visitas e folgas — clique num dia para ver o detalhe.</p>
           </div>
         </div>
-        <div class="card"><div class="card-bd" style="padding:14px;">
-          <div class="cg" id="cal-hd"></div>
-          <div class="cg" style="margin-top:3px;" id="cal-bd"></div>
-        </div></div>
+        <div class="card">
+          <div class="card-bd" style="padding:16px;">
+            <div class="cal-hdr">
+              <div class="cal-nav-btns">
+                <button class="btn btn-outline btn-sm" onclick="calMover(-1)"><i class="ti ti-chevron-left"></i></button>
+                <span class="cal-month" id="cal-mes"></span>
+                <button class="btn btn-outline btn-sm" onclick="calMover(1)"><i class="ti ti-chevron-right"></i></button>
+              </div>
+              <div style="display:flex;gap:14px;align-items:center;font-size:11px;color:#9A9388;">
+                <span style="display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:#1A4AAA;display:inline-block;"></span>Visita</span>
+                <span style="display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:#8B2020;display:inline-block;"></span>Folga</span>
+              </div>
+            </div>
+            <div class="cal-grid" id="cal-cab"></div>
+            <div class="cal-grid" style="margin-top:3px;" id="cal-corp"></div>
+          </div>
+        </div>
         <div class="cal-dtl" id="cal-dtl">
-          <div class="cd-hd"><div class="cd-ttl" id="cd-ttl"></div><button class="btn btn-ghost btn-sm" onclick="closeDtl()">✕</button></div>
+          <div class="cd-hd">
+            <div class="cd-ttl" id="cd-ttl"></div>
+            <button class="btn btn-ghost btn-sm" onclick="fecharDtl()"><i class="ti ti-x"></i></button>
+          </div>
           <div class="cd-bd" id="cd-bd"></div>
         </div>
       </div>
 
-      <!-- ADMIN -->
-      <div class="page" id="page-admin">
-        <div class="ph"><div><h1>Administration</h1><p>Cleaning tasks, programme rules and store directory.</p></div></div>
+      <!-- ══════════ ADMINISTRAÇÃO ══════════ -->
+      <div class="page" id="page-administracao">
+        <div class="ph">
+          <div class="ph-l">
+            <h1><em>Administração</em></h1>
+            <p>Tarefas de limpeza, regras do programa e diretório de lojas.</p>
+          </div>
+        </div>
         <div class="g2" style="align-items:start;">
+          <!-- TAREFAS -->
           <div class="card">
-            <div class="card-hd"><span class="card-ttl">Cleaning Tasks</span><span class="badge bd-stone" id="t-badge">0 tasks</span></div>
+            <div class="card-hd">
+              <span class="card-ttl">Tarefas de Limpeza</span>
+              <span class="bdg bdg-stone" id="t-badge">0 tarefas</span>
+            </div>
             <div class="card-bd">
-              <div id="t-list"></div>
-              <hr class="dv">
-              <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--c4);margin-bottom:14px;">New Task</div>
-              <div class="fg"><label class="fl">Description</label><input type="text" id="nt-n" placeholder="e.g. Mop all floor areas"></div>
-              <div class="g2" style="gap:12px;">
-                <div class="fg" style="margin:0;"><label class="fl">Category</label>
-                  <select id="nt-c"><option value="Floors">🧹 Floors</option><option value="Shelving">📦 Shelving</option><option value="Restrooms">🚿 Restrooms</option><option value="Exterior">🌿 Exterior</option><option value="Equipment">⚙️ Equipment</option><option value="Glass">🪟 Glass</option><option value="Stockroom">🗃️ Stockroom</option><option value="General">✅ General</option></select>
+              <div id="t-lista"></div>
+              <hr class="sep">
+              <div style="font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#9A9388;margin-bottom:12px;">Nova Tarefa</div>
+              <div class="fg"><label class="fl">Descrição</label><input type="text" id="nt-n" placeholder="ex: Varrer e lavar o chão da loja"></div>
+              <div class="g2" style="gap:12px;margin-bottom:14px;">
+                <div class="fg" style="margin:0;"><label class="fl">Categoria</label>
+                  <select id="nt-c">
+                    <option value="Chão">🧹 Chão</option>
+                    <option value="Lineares">📦 Lineares</option>
+                    <option value="Sanitários">🚿 Sanitários</option>
+                    <option value="Exterior">🌿 Exterior</option>
+                    <option value="Equipamentos">⚙️ Equipamentos</option>
+                    <option value="Vidros">🪟 Vidros</option>
+                    <option value="Armazém">🗃️ Armazém</option>
+                    <option value="Geral">✅ Geral</option>
+                  </select>
                 </div>
-                <div class="fg" style="margin:0;"><label class="fl">Frequency</label>
-                  <select id="nt-f"><option>Per visit</option><option>Daily</option><option>Weekly</option></select>
+                <div class="fg" style="margin:0;"><label class="fl">Frequência</label>
+                  <select id="nt-f"><option>Por visita</option><option>Diária</option><option>Semanal</option></select>
                 </div>
               </div>
-              <button class="btn btn-dark" style="width:100%;margin-top:12px;justify-content:center;" onclick="addTask()">+ Add Task</button>
+              <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="adicionarTarefa()">
+                <i class="ti ti-plus"></i> Adicionar Tarefa
+              </button>
             </div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:18px;">
+
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <!-- CONFIGURAÇÃO -->
             <div class="card">
-              <div class="card-hd"><span class="card-ttl">Programme Configuration</span></div>
-              <div class="card-bd" style="padding:4px 22px 16px;">
-                <div class="cfi"><div><div class="cfl">Team size</div><div class="cfd">Fixed — 2 operators per visit</div></div><div class="cfc"><span class="badge bd-gold">2 Fixed</span></div></div>
-                <div class="cfi"><div><div class="cfl">Weekly rest day</div><div class="cfd">Day off for all cleaning teams</div></div><div class="cfc"><select id="cfg-rest" onchange="saveCfg()" style="width:140px;"><option value="0">Sunday</option><option value="6" selected>Saturday</option><option value="5">Friday</option></select></div></div>
-                <div class="cfi"><div><div class="cfl">Coverage model</div><div class="cfd">1 store per team per working day</div></div><div class="cfc"><span class="badge bd-teal">Sequential</span></div></div>
-                <div class="cfi"><div><div class="cfl">GV scope</div><div class="cfd">Filtered at source — Google Sheets live</div></div><div class="cfc"><span class="badge bd-gold">Carlos Daniel</span></div></div>
+              <div class="card-hd"><span class="card-ttl">Configuração do Programa</span></div>
+              <div class="card-bd" style="padding:4px 20px 16px;">
+                <div class="cfg-r"><div><div class="cfg-l">Dimensão da equipa</div><div class="cfg-d">2 operadores por visita — fixo</div></div><div class="cfg-c"><span class="bdg bdg-gold">2 Fixo</span></div></div>
+                <div class="cfg-r">
+                  <div><div class="cfg-l">Dia de folga semanal</div><div class="cfg-d">Dia de descanso de todas as equipas</div></div>
+                  <div class="cfg-c"><select id="cfg-rest" onchange="guardarCfg()" style="width:148px;"><option value="0">Domingo</option><option value="6" selected>Sábado</option><option value="5">Sexta-feira</option></select></div>
+                </div>
+                <div class="cfg-r"><div><div class="cfg-l">Modelo de cobertura</div><div class="cfg-d">1 loja por equipa por dia útil</div></div><div class="cfg-c"><span class="bdg bdg-teal">Sequencial</span></div></div>
+                <div class="cfg-r"><div><div class="cfg-l">Filtro GV</div><div class="cfg-d">Carregado em tempo real — Google Sheets</div></div><div class="cfg-c"><span class="bdg bdg-gold">Carlos Daniel</span></div></div>
               </div>
             </div>
+
+            <!-- DIRETÓRIO DE LOJAS -->
             <div class="card">
-              <div class="card-hd"><span class="card-ttl">Store Directory</span><span class="badge bd-stone" id="dir-badge">—</span></div>
+              <div class="card-hd">
+                <span class="card-ttl">Diretório de Lojas</span>
+                <span class="bdg bdg-stone" id="dir-badge">—</span>
+              </div>
               <div class="card-bd" style="padding:0;">
-                <div style="padding:12px 16px;border-bottom:1px solid var(--c2);"><input type="text" id="dir-q" placeholder="Filter stores…" oninput="renderDir()"></div>
-                <div style="max-height:340px;overflow-y:auto;" id="dir-list"></div>
+                <div style="padding:12px 16px;border-bottom:1px solid #F0EDE6;">
+                  <input type="text" id="dir-q" placeholder="Filtrar lojas…" oninput="renderDir()">
+                </div>
+                <div style="max-height:320px;overflow-y:auto;" id="dir-lista"></div>
               </div>
             </div>
           </div>
@@ -362,251 +613,292 @@ hr.dv{border:none;border-top:1px solid var(--c2);margin:20px 0;}
 </div>
 
 <script>
-const SHEET_ID='1ybnb1bMtRxwgcn6OL5fsZ6lD8XBkpXjY';
-const GV_FILTER='CARLOS DANIEL ALMEIDA COSTA';
-const gviz=s=>`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(s)}`;
+const SHEET_ID = '1ybnb1bMtRxwgcn6OL5fsZ6lD8XBkpXjY';
+const GV       = 'CARLOS DANIEL ALMEIDA COSTA';
+const gvizURL  = s => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(s)}`;
 
-let DB={stores:[],operators:[]};
-let APP={sels:{},tasks:[],sched:{},cfg:{rest:6}};
-const mk=(m,y)=>`${y}-${String(+m+1).padStart(2,'0')}`;
-const sv=()=>{try{localStorage.setItem('nxops4',JSON.stringify(APP));}catch(e){}};
-const ld=()=>{try{const s=localStorage.getItem('nxops4');if(s)APP=JSON.parse(s);}catch(e){}};
+let DB  = { lojas:[], operadores:[] };
+let APP = { sels:{}, tarefas:[], agenda:{}, cfg:{ folga:6 } };
 
-async function fetchGviz(sheet){
-  const r=await fetch(gviz(sheet));
-  if(!r.ok)throw new Error(`HTTP ${r.status} — "${sheet}"`);
-  const txt=await r.text();
-  const json=JSON.parse(txt.replace(/^[^(]+\(/,'').replace(/\);\s*$/,''));
-  const cols=json.table.cols.map(c=>c.label||c.id);
-  return(json.table.rows||[]).map(row=>{
+const mk  = (m,a) => `${a}-${String(+m+1).padStart(2,'0')}`;
+const gravar = () => { try{localStorage.setItem('opsclean1',JSON.stringify(APP));}catch(e){} };
+const carregar = () => { try{const s=localStorage.getItem('opsclean1');if(s)APP=JSON.parse(s);}catch(e){} };
+
+async function fetchSheet(nome) {
+  const r = await fetch(gvizURL(nome));
+  if (!r.ok) throw new Error(`HTTP ${r.status} — "${nome}"`);
+  const txt = await r.text();
+  const json = JSON.parse(txt.replace(/^[^(]+\(/,'').replace(/\);\s*$/,''));
+  const cols = json.table.cols.map(c => c.label || c.id);
+  return (json.table.rows||[]).map(row => {
     const o={};
-    cols.forEach((c,i)=>{const cell=row.c&&row.c[i];o[c]=cell&&cell.v!=null?String(cell.v):'';});
+    cols.forEach((c,i)=>{ const cell=row.c&&row.c[i]; o[c]=cell&&cell.v!=null?String(cell.v):''; });
     return o;
   });
 }
 
-async function reload(){
-  setSy('spin','Syncing…');bMsg('Fetching store directory…');
-  try{
-    const sr=await fetchGviz('SalesKPIsStore 2');
-    DB.stores=sr.filter(r=>(r['Dim Lojas[Nome GV]']||'').trim().toUpperCase()===GV_FILTER&&(r['Dim Lojas[LOJA]']||'').trim())
-      .map(r=>({id:(r['Dim Centros[Nro Centro (#)]']||'').trim(),name:(r['Dim Lojas[LOJA]']||'').trim(),sup:(r['Dim Lojas[Nome Supervisor]']||'').trim()}));
-    bMsg('Fetching operator headcount…');
-    const hr=await fetchGviz('HeadcountReport2025');
-    DB.operators=hr.filter(r=>(r['File HC Atual[Regime]']||'').trim()==='FT'&&(r['File HC Atual[Descritivo da Função]']||'').trim()==='Operador de loja')
-      .map(r=>({id:String(r['File HC Atual[Nº pessoal]']||'').trim(),name:(r['File HC Atual[Nome]']||'').trim()}));
-    setSy('ok','Live');hideBoot();afterLoad();
-  }catch(e){
-    console.error(e);setSy('err','Error');hideBoot();
-    const el=document.getElementById('sel-err');
-    el.textContent=`Cannot load from Google Sheets: ${e.message}. Make sure the spreadsheet is shared publicly (Anyone with the link → Viewer) and published to web (File → Share → Publish to web).`;
-    el.style.display='block';
+async function recarregar() {
+  setSync('spin','A sincronizar…');
+  setMsg('A carregar diretório de lojas…');
+  try {
+    const sr = await fetchSheet('SalesKPIsStore 2');
+    DB.lojas = sr
+      .filter(r => (r['Dim Lojas[Nome GV]']||'').trim().toUpperCase()===GV && (r['Dim Lojas[LOJA]']||'').trim())
+      .map(r => ({
+        id:   (r['Dim Centros[Nro Centro (#)]']||'').trim(),
+        nome: (r['Dim Lojas[LOJA]']||'').trim(),
+        sup:  (r['Dim Lojas[Nome Supervisor]']||'').trim()
+      }));
+
+    setMsg('A carregar headcount de operadores…');
+    const hr = await fetchSheet('HeadcountReport2025');
+    DB.operadores = hr
+      .filter(r => (r['File HC Atual[Regime]']||'').trim()==='FT' && (r['File HC Atual[Descritivo da Função]']||'').trim()==='Operador de loja')
+      .map(r => ({
+        id:   String(r['File HC Atual[Nº pessoal]']||'').trim(),
+        nome: (r['File HC Atual[Nome]']||'').trim()
+      }));
+
+    setSync('ok','Sincronizado');
+    esconderBoot();
+    aposCarregar();
+  } catch(e) {
+    console.error(e);
+    setSync('err','Erro');
+    esconderBoot();
+    const el = document.getElementById('sel-err');
+    el.textContent = `Não foi possível carregar do Google Sheets: ${e.message}. Certifique-se que a folha está partilhada publicamente (Qualquer pessoa com o link → Leitor) e publicada na web (Ficheiro → Partilhar → Publicar na web).`;
+    el.style.display = 'block';
   }
 }
 
-function afterLoad(){updKPIs();renderSel();renderDir();renderSched();renderCal();}
-function bMsg(t){document.getElementById('boot-msg').textContent=t;}
-function hideBoot(){setTimeout(()=>{const b=document.getElementById('boot');b.classList.add('out');setTimeout(()=>b.style.display='none',700);},300);}
-function setSy(st,txt){const d=document.getElementById('sdot'),t=document.getElementById('stxt');d.className='sdot'+(st==='spin'?' spin':st==='err'?' err':'');t.textContent=txt;}
+function aposCarregar() { atualizarKPIs(); renderSel(); renderDir(); renderAgenda(); renderCal(); }
+function setMsg(t) { document.getElementById('boot-msg').textContent = t; }
+function esconderBoot() {
+  setTimeout(() => {
+    const b = document.getElementById('boot');
+    b.classList.add('hide');
+    setTimeout(() => b.style.display='none', 600);
+  }, 200);
+}
+function setSync(st, txt) {
+  document.getElementById('sdot').className = 'sdot'+(st==='spin'?' spin':st==='err'?' err':'');
+  document.getElementById('stxt').textContent = txt;
+}
 
-const CRUMBS={selection:'Selection',schedule:'Schedule',calendar:'Calendar',admin:'Administration'};
-function go(page,btn){
+const NOMES_PAGS = { selecao:'Seleção Mensal', agenda:'Agenda de Trabalhos', calendario:'Calendário', administracao:'Administração' };
+function go(pag, btn) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.nv').forEach(b=>b.classList.remove('on'));
-  document.getElementById('page-'+page).classList.add('on');
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('page-'+pag).classList.add('on');
   btn.classList.add('on');
-  document.getElementById('crumb').innerHTML=`Programme · <strong>${CRUMBS[page]}</strong>`;
-  if(page==='schedule'){syncSM();renderSched();}
-  if(page==='calendar')renderCal();
-  if(page==='admin'){renderTasks();renderDir();}
+  document.getElementById('crumb-cur').textContent = NOMES_PAGS[pag];
+  if (pag==='agenda') { syncMesAgenda(); renderAgenda(); }
+  if (pag==='calendario') renderCal();
+  if (pag==='administracao') { renderTarefas(); renderDir(); }
 }
 
-function updKPIs(){
-  const su=getSups();
-  ['kv-s','kv-su','kv-op'].forEach(id=>document.getElementById(id).classList.remove('ld'));
-  document.getElementById('kv-s').textContent=DB.stores.length;
-  document.getElementById('kv-su').textContent=su.length;
-  document.getElementById('kv-op').textContent=DB.operators.length;
-  document.getElementById('kv-pr-sub').textContent=`of ${su.length} supervisors`;
-  updPairs();
+function atualizarKPIs() {
+  const sups = getSups();
+  ['kv-l','kv-s','kv-o'].forEach(id=>document.getElementById(id).classList.remove('ld'));
+  document.getElementById('kv-l').textContent = DB.lojas.length;
+  document.getElementById('kv-s').textContent = sups.length;
+  document.getElementById('kv-o').textContent = DB.operadores.length;
+  document.getElementById('kv-ps').textContent = `de ${sups.length} supervisores`;
+  atualizarPares();
 }
-function updPairs(){
+function atualizarPares() {
   const m=document.getElementById('sel-m')?.value??new Date().getMonth();
-  const y=document.getElementById('sel-y')?.value??new Date().getFullYear();
-  const key=mk(m,y);const su=getSups();
-  document.getElementById('kv-pr').textContent=su.filter(s=>APP.sels[key]?.[s]?.op1&&APP.sels[key]?.[s]?.op2).length;
+  const a=document.getElementById('sel-a')?.value??new Date().getFullYear();
+  const key=mk(m,a), sups=getSups();
+  document.getElementById('kv-p').textContent = sups.filter(s=>APP.sels[key]?.[s]?.op1&&APP.sels[key]?.[s]?.op2).length;
 }
 
-function getSups(){return[...new Set(DB.stores.map(s=>s.sup).filter(Boolean))].sort();}
-function getBS(sup){return DB.stores.filter(s=>s.sup===sup);}
+function getSups() { return[...new Set(DB.lojas.map(l=>l.sup).filter(Boolean))].sort(); }
+function getLojasSup(sup) { return DB.lojas.filter(l=>l.sup===sup); }
 
-function renderSel(){
+function renderSel() {
   const m=document.getElementById('sel-m')?.value??new Date().getMonth();
-  const y=document.getElementById('sel-y')?.value??new Date().getFullYear();
-  const key=mk(m,y);if(!APP.sels[key])APP.sels[key]={};
-  const su=getSups();updPairs();
-  if(!su.length){
-    document.getElementById('sup-list').innerHTML=`<div class="card"><div class="card-bd"><div class="empty"><div class="ei">📡</div><p>No data loaded. Use <strong>Refresh data</strong> in the sidebar.</p></div></div></div>`;return;
+  const a=document.getElementById('sel-a')?.value??new Date().getFullYear();
+  const key=mk(m,a); if(!APP.sels[key]) APP.sels[key]={};
+  const sups=getSups(); atualizarPares();
+  if (!sups.length) {
+    document.getElementById('sup-lista').innerHTML=`<div class="card"><div class="card-bd"><div class="empty"><i class="ti ti-wifi-off"></i><p>Sem dados carregados. Use <strong>Atualizar dados</strong> na barra lateral.</p></div></div></div>`;
+    return;
   }
-  const opts=sel=>`<option value="">— Select operator —</option>`+DB.operators.map(o=>`<option value="${o.id}"${sel===o.id?' selected':''}>${o.name}</option>`).join('');
-  document.getElementById('sup-list').innerHTML=su.map(sup=>{
-    const stores=getBS(sup),s=APP.sels[key][sup]||{op1:'',op2:''},done=s.op1&&s.op2;
-    const prev=stores.slice(0,5).map(x=>x.id).join(', ')+(stores.length>5?` +${stores.length-5}`:'');
-    return`<div class="sup-row">
+  const opOpts = sel => `<option value="">— Selecionar operador —</option>`+DB.operadores.map(o=>`<option value="${o.id}"${sel===o.id?' selected':''}>${o.nome}</option>`).join('');
+  document.getElementById('sup-lista').innerHTML = sups.map(sup => {
+    const lojas=getLojasSup(sup), s=APP.sels[key][sup]||{op1:'',op2:''}, pronto=s.op1&&s.op2;
+    const prev=lojas.slice(0,5).map(x=>x.id).join(', ')+(lojas.length>5?` +${lojas.length-5}`:'');
+    return `<div class="sup-block">
       <div class="sup-hd">
-        <div><div class="sup-name">${toTC(sup)}</div><div class="sup-stores">${stores.length} store${stores.length!==1?'s':''} — ${prev}</div></div>
-        ${done?'<span class="badge bd-teal">✓ Pair assigned</span>':'<span class="badge bd-stone">Pending</span>'}
+        <div>
+          <div class="sup-name">${toTitle(sup)}</div>
+          <div class="sup-sub">${lojas.length} loja${lojas.length!==1?'s':''} — ${prev}</div>
+        </div>
+        ${pronto?'<span class="bdg bdg-green"><i class="ti ti-check" style="font-size:12px;"></i> Par atribuído</span>':'<span class="bdg bdg-stone">Pendente</span>'}
       </div>
       <div class="sup-bd">
-        <div class="fg" style="margin:0;"><label class="fl">Operator 1</label><select onchange="saveSel('${key}','${sup}','op1',this.value)">${opts(s.op1)}</select></div>
-        <div class="fg" style="margin:0;"><label class="fl">Operator 2</label><select onchange="saveSel('${key}','${sup}','op2',this.value)">${opts(s.op2)}</select></div>
+        <div class="fg" style="margin:0;"><label class="fl">Operador 1</label><select onchange="guardarSel('${key}','${sup}','op1',this.value)">${opOpts(s.op1)}</select></div>
+        <div class="fg" style="margin:0;"><label class="fl">Operador 2</label><select onchange="guardarSel('${key}','${sup}','op2',this.value)">${opOpts(s.op2)}</select></div>
       </div>
     </div>`;
   }).join('');
 }
 
-function saveSel(key,sup,f,v){
-  if(!APP.sels[key])APP.sels[key]={};
-  if(!APP.sels[key][sup])APP.sels[key][sup]={op1:'',op2:''};
-  APP.sels[key][sup][f]=v;sv();updPairs();
+function guardarSel(key,sup,f,v) {
+  if(!APP.sels[key]) APP.sels[key]={};
+  if(!APP.sels[key][sup]) APP.sels[key][sup]={op1:'',op2:''};
+  APP.sels[key][sup][f]=v; gravar(); atualizarPares();
 }
 
-function genSched(){
-  const m=document.getElementById('sel-m').value,y=document.getElementById('sel-y').value;
-  const key=mk(m,y),sels=APP.sels[key]||{},rest=+APP.cfg.rest;
-  const entries=[];
+function gerarAgenda() {
+  const m=document.getElementById('sel-m').value, a=document.getElementById('sel-a').value;
+  const key=mk(m,a), sels=APP.sels[key]||{}, folga=+APP.cfg.folga;
+  const entradas=[];
   getSups().forEach(sup=>{
-    const s=sels[sup]||{};if(!s.op1||!s.op2)return;
-    const stores=getBS(sup);if(!stores.length)return;
-    const dim=new Date(+y,+m+1,0).getDate(),wd=[];
-    for(let d=1;d<=dim;d++)if(new Date(+y,+m,d).getDay()!==rest)wd.push(d);
-    wd.forEach((day,i)=>{const st=stores[i%stores.length];entries.push({date:`${y}-${String(+m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`,sup,op1:s.op1,op2:s.op2,sid:st.id,sname:st.name});});
+    const s=sels[sup]||{}; if(!s.op1||!s.op2) return;
+    const lojas=getLojasSup(sup); if(!lojas.length) return;
+    const dim=new Date(+a,+m+1,0).getDate(), diasUtil=[];
+    for(let d=1;d<=dim;d++) if(new Date(+a,+m,d).getDay()!==folga) diasUtil.push(d);
+    diasUtil.forEach((dia,i)=>{
+      const lj=lojas[i%lojas.length];
+      entradas.push({ data:`${a}-${String(+m+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`, sup, op1:s.op1, op2:s.op2, lid:lj.id, lnome:lj.nome });
+    });
   });
-  APP.sched[key]=entries;sv();
-  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  alert(`Schedule generated — ${entries.length} visits across ${MN[m]} ${y}.`);
+  APP.agenda[key]=entradas; gravar();
+  const MES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  alert(`Agenda gerada — ${entradas.length} visitas em ${MES[m]} ${a}.`);
 }
 
-function syncSM(){document.getElementById('ag-m').value=document.getElementById('sel-m').value;document.getElementById('ag-y').value=document.getElementById('sel-y').value;}
-function opN(id){const o=DB.operators.find(x=>x.id===id);return o?o.name:id;}
-function opS(id){const n=opN(id).split(' ');return n[0]+' '+n[n.length-1];}
+function syncMesAgenda() {
+  document.getElementById('ag-m').value=document.getElementById('sel-m').value;
+  document.getElementById('ag-a').value=document.getElementById('sel-a').value;
+}
+function opNome(id) { const o=DB.operadores.find(x=>x.id===id); return o?o.nome:id; }
+function opCurto(id) { const n=opNome(id).split(' '); return n[0]+' '+n[n.length-1]; }
 
-function renderSched(){
+function renderAgenda() {
   const m=document.getElementById('ag-m')?.value??new Date().getMonth();
-  const y=document.getElementById('ag-y')?.value??new Date().getFullYear();
-  const key=mk(m,y),ents=APP.sched[key]||[],q=(document.getElementById('ag-q')?.value||'').toLowerCase();
-  const el=document.getElementById('sched-out');
-  if(!ents.length){el.innerHTML=`<div class="card"><div class="card-bd"><div class="empty"><div class="ei">📅</div><p>No schedule for this month.<br>Go to <strong>Selection</strong>, assign pairs, then <strong>Generate Schedule</strong>.</p></div></div></div>`;return;}
-  let list=q?ents.filter(e=>e.sname.toLowerCase().includes(q)||opN(e.op1).toLowerCase().includes(q)||opN(e.op2).toLowerCase().includes(q)||e.sup.toLowerCase().includes(q)):ents;
-  const wks={};
-  list.forEach(e=>{const d=new Date(e.date+'T12:00:00'),wk=isoWk(d);(wks[wk]=wks[wk]||[]).push(e);});
-  const DA=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],MS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  let html=`<div style="font-size:12px;color:var(--c4);margin-bottom:20px;">${list.length} visit${list.length!==1?'s':''} scheduled${q?' (filtered)':''}</div>`;
-  Object.keys(wks).sort((a,b)=>+a-+b).forEach(wk=>{
-    const we=wks[wk],f=new Date(we[0].date+'T12:00:00'),l=new Date(we[we.length-1].date+'T12:00:00');
-    html+=`<div class="wk-hd">Week ${wk} · ${f.getDate()} ${MS[f.getMonth()]} — ${l.getDate()} ${MS[l.getMonth()]}</div>
+  const a=document.getElementById('ag-a')?.value??new Date().getFullYear();
+  const key=mk(m,a), ents=APP.agenda[key]||[], q=(document.getElementById('ag-q')?.value||'').toLowerCase();
+  const el=document.getElementById('agenda-out');
+  if(!ents.length){
+    el.innerHTML=`<div class="card"><div class="card-bd"><div class="empty"><i class="ti ti-calendar-x"></i><p>Sem agenda para este mês.<br>Vá a <strong>Seleção Mensal</strong>, atribua os pares e clique em <strong>Gerar Agenda</strong>.</p></div></div></div>`;
+    return;
+  }
+  let lista=q?ents.filter(e=>e.lnome.toLowerCase().includes(q)||opNome(e.op1).toLowerCase().includes(q)||opNome(e.op2).toLowerCase().includes(q)||e.sup.toLowerCase().includes(q)):ents;
+  const semanas={};
+  lista.forEach(e=>{ const d=new Date(e.data+'T12:00:00'),s=isoSemana(d); (semanas[s]=semanas[s]||[]).push(e); });
+  const DA=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'],MS=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  let html=`<div style="font-size:12px;color:#9A9388;margin-bottom:20px;">${lista.length} visita${lista.length!==1?'s':''} programada${lista.length!==1?'s':''}${q?' (filtrado)':''}</div>`;
+  Object.keys(semanas).sort((a,b)=>+a-+b).forEach(s=>{
+    const we=semanas[s],f=new Date(we[0].data+'T12:00:00'),l=new Date(we[we.length-1].data+'T12:00:00');
+    html+=`<div class="wk-sep">Semana ${s} · ${f.getDate()} ${MS[f.getMonth()]} — ${l.getDate()} ${MS[l.getMonth()]}</div>
     <div class="card" style="margin-bottom:0;"><div class="tw"><table>
-      <thead><tr><th>Date</th><th>Store</th><th>Supervisor</th><th>Operator 1</th><th>Operator 2</th><th>Tasks</th></tr></thead>
-      <tbody>${we.map(e=>{const d=new Date(e.date+'T12:00:00');return`<tr>
-        <td><strong>${DA[d.getDay()]}</strong> <span style="color:var(--c4);">${d.getDate()}/${d.getMonth()+1}</span></td>
-        <td><span class="chip">${e.sid}</span> <span style="color:var(--c4);font-size:12px;margin-left:6px;">${e.sname}</span></td>
-        <td style="font-size:12px;color:var(--c4);">${toTC(e.sup)}</td>
-        <td><span class="badge bd-op1">${opS(e.op1)}</span></td>
-        <td><span class="badge bd-op2">${opS(e.op2)}</span></td>
-        <td style="font-size:11px;color:var(--c4);">${APP.tasks.length}</td>
+      <thead><tr><th>Data</th><th>Loja</th><th>Supervisor</th><th>Operador 1</th><th>Operador 2</th><th>Tarefas</th></tr></thead>
+      <tbody>${we.map(e=>{const d=new Date(e.data+'T12:00:00');return`<tr>
+        <td><strong>${DA[d.getDay()]}</strong> <span style="color:#9A9388;">${d.getDate()}/${d.getMonth()+1}</span></td>
+        <td><span class="sid-chip">${e.lid}</span> <span style="color:#9A9388;font-size:12px;margin-left:6px;">${e.lnome}</span></td>
+        <td style="font-size:12px;color:#9A9388;">${toTitle(e.sup)}</td>
+        <td><span class="bdg bdg-blue">${opCurto(e.op1)}</span></td>
+        <td><span class="bdg bdg-teal">${opCurto(e.op2)}</span></td>
+        <td style="font-size:11px;color:#9A9388;">${APP.tarefas.length}</td>
       </tr>`;}).join('')}</tbody>
     </table></div></div>`;
   });
   el.innerHTML=html;
 }
-function isoWk(d){const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),day=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-day);const y1=new Date(Date.UTC(dt.getUTCFullYear(),0,1));return Math.ceil((((dt-y1)/86400000)+1)/7);}
 
-let calY,calM;
-function initCal(){const n=new Date();calY=n.getFullYear();calM=n.getMonth();}
-function calShift(d){calM+=d;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderCal();}
-function closeDtl(){document.getElementById('cal-dtl').classList.remove('open');}
+function isoSemana(d){const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),day=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-day);const a1=new Date(Date.UTC(dt.getUTCFullYear(),0,1));return Math.ceil((((dt-a1)/86400000)+1)/7);}
+
+let calA,calM2;
+function initCal(){const n=new Date();calA=n.getFullYear();calM2=n.getMonth();}
+function calMover(d){calM2+=d;if(calM2<0){calM2=11;calA--;}if(calM2>11){calM2=0;calA++;}renderCal();}
+function fecharDtl(){document.getElementById('cal-dtl').classList.remove('open');}
 
 function renderCal(){
-  const key=mk(calM,calY),ents=APP.sched[key]||[],rest=+APP.cfg.rest;
-  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  document.getElementById('cal-lbl').textContent=`${MN[calM]} ${calY}`;
-  const dm={};ents.forEach(e=>{const d=+e.date.split('-')[2];(dm[d]=dm[d]||[]).push(e);});
-  const fd=new Date(calY,calM,1).getDay(),dim=new Date(calY,calM+1,0).getDate(),pd=new Date(calY,calM,0).getDate(),td=new Date();
-  document.getElementById('cal-hd').innerHTML=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cdl">${d}</div>`).join('');
+  const key=mk(calM2,calA),ents=APP.agenda[key]||[],folga=+APP.cfg.folga;
+  const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  document.getElementById('cal-mes').textContent=`${MESES[calM2]} ${calA}`;
+  const dm={}; ents.forEach(e=>{const d=+e.data.split('-')[2];(dm[d]=dm[d]||[]).push(e);});
+  const fd=new Date(calA,calM2,1).getDay(),dim=new Date(calA,calM2+1,0).getDate(),pd=new Date(calA,calM2,0).getDate(),hj=new Date();
+  document.getElementById('cal-cab').innerHTML=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d=>`<div class="cal-day-label">${d}</div>`).join('');
   let cells='';
-  for(let i=fd-1;i>=0;i--)cells+=`<div class="cc dim"><div class="cn">${pd-i}</div></div>`;
+  for(let i=fd-1;i>=0;i--)cells+=`<div class="cc dim"><div class="cc-num">${pd-i}</div></div>`;
   for(let d=1;d<=dim;d++){
-    const dow=new Date(calY,calM,d).getDay(),isR=dow===rest,isT=td.getFullYear()===calY&&td.getMonth()===calM&&td.getDate()===d,de=dm[d]||[];
-    let pips=isR?`<span class="pip pr">Rest day</span>`:'';
-    if(!isR){de.slice(0,3).forEach(e=>pips+=`<span class="pip pv" title="${e.sname}">${e.sid}</span>`);if(de.length>3)pips+=`<span style="font-size:9px;color:var(--c4)">+${de.length-3}</span>`;}
-    cells+=`<div class="cc${isR?' rest':''}${isT?' tdy':''}" onclick="calDtl(${d})"><div class="cn">${isT?`<div style="background:var(--acc);color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;">${d}</div>`:d}</div>${pips}</div>`;
+    const dow=new Date(calA,calM2,d).getDay(),isF=dow===folga,isH=hj.getFullYear()===calA&&hj.getMonth()===calM2&&hj.getDate()===d,de=dm[d]||[];
+    let pips=isF?`<span class="cpip cpip-r">Folga</span>`:'';
+    if(!isF){de.slice(0,3).forEach(e=>pips+=`<span class="cpip cpip-v" title="${e.lnome}">${e.lid}</span>`);if(de.length>3)pips+=`<span style="font-size:9px;color:#9A9388">+${de.length-3}</span>`;}
+    cells+=`<div class="cc${isF?' rest':''}${isH?' tdy':''}" onclick="calDetalhe(${d})"><div class="cc-num">${isH?`<div style="background:#C8A85C;color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;">${d}</div>`:d}</div>${pips}</div>`;
   }
   const tot=Math.ceil((fd+dim)/7)*7;
-  for(let nd=1;nd<=tot-fd-dim;nd++)cells+=`<div class="cc dim"><div class="cn">${nd}</div></div>`;
-  document.getElementById('cal-bd').innerHTML=cells;
+  for(let nd=1;nd<=tot-fd-dim;nd++)cells+=`<div class="cc dim"><div class="cc-num">${nd}</div></div>`;
+  document.getElementById('cal-corp').innerHTML=cells;
 }
 
-function calDtl(day){
-  const key=mk(calM,calY),ents=(APP.sched[key]||[]).filter(e=>+e.date.split('-')[2]===day);
-  const dow=new Date(calY,calM,day).getDay(),isR=dow===+APP.cfg.rest;
-  const DA2=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  const MS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  document.getElementById('cd-ttl').textContent=`${DA2[dow]}, ${day} ${MS[calM]} ${calY}`;
+function calDetalhe(dia){
+  const key=mk(calM2,calA),ents=(APP.agenda[key]||[]).filter(e=>+e.data.split('-')[2]===dia);
+  const dow=new Date(calA,calM2,dia).getDay(),isF=dow===+APP.cfg.folga;
+  const DA2=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'],MS=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  document.getElementById('cd-ttl').textContent=`${DA2[dow]}, ${dia} ${MS[calM2]} ${calA}`;
   let body='';
-  if(isR){body=`<div class="empty"><div class="ei">🔴</div><p>Rest day — no visits.</p></div>`;}
-  else if(!ents.length){body=`<div class="empty"><div class="ei">📭</div><p>No visits on this day. Generate a schedule from <strong>Selection</strong>.</p></div>`;}
+  if(isF){body=`<div class="empty"><i class="ti ti-moon"></i><p>Dia de folga — sem visitas programadas.</p></div>`;}
+  else if(!ents.length){body=`<div class="empty"><i class="ti ti-calendar-off"></i><p>Sem visitas neste dia.<br>Gere uma agenda em <strong>Seleção Mensal</strong>.</p></div>`;}
   else{
-    const rows=ents.map(e=>`<tr><td><span class="chip">${e.sid}</span></td><td>${e.sname}</td><td style="font-size:12px;color:var(--c4);">${toTC(e.sup)}</td><td><span class="badge bd-op1">${opS(e.op1)}</span></td><td><span class="badge bd-op2">${opS(e.op2)}</span></td></tr>`).join('');
-    const tasks=APP.tasks.map(t=>`<div class="ti"><div class="ti-ico">${ico(t.cat)}</div><div class="ti-info"><div class="ti-name">${t.name}</div><div class="ti-meta">${t.cat} · ${t.freq}</div></div><input type="checkbox" style="accent-color:var(--acc);width:16px;height:16px;"></div>`).join('')||`<p style="font-size:12px;color:var(--c4);">No tasks defined. Add in <strong>Administration</strong>.</p>`;
-    body=`<div class="tw" style="margin-bottom:20px;"><table><thead><tr><th>ID</th><th>Store</th><th>Supervisor</th><th>Op 1</th><th>Op 2</th></tr></thead><tbody>${rows}</tbody></table></div><div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--c4);margin-bottom:12px;">Checklist</div>${tasks}`;
+    const rows=ents.map(e=>`<tr><td><span class="sid-chip">${e.lid}</span></td><td>${e.lnome}</td><td style="font-size:12px;color:#9A9388;">${toTitle(e.sup)}</td><td><span class="bdg bdg-blue">${opCurto(e.op1)}</span></td><td><span class="bdg bdg-teal">${opCurto(e.op2)}</span></td></tr>`).join('');
+    const tarefas=APP.tarefas.map(t=>`<div class="task-item"><div class="ti-ico">${icone(t.cat)}</div><div class="ti-info"><div class="ti-name">${t.nome}</div><div class="ti-meta">${t.cat} · ${t.freq}</div></div><input type="checkbox" style="accent-color:#C8A85C;width:15px;height:15px;cursor:pointer;"></div>`).join('')||`<p style="font-size:12px;color:#9A9388;">Sem tarefas definidas. Adicione na <strong>Administração</strong>.</p>`;
+    body=`<div class="tw" style="margin-bottom:20px;"><table><thead><tr><th>ID</th><th>Loja</th><th>Supervisor</th><th>Op. 1</th><th>Op. 2</th></tr></thead><tbody>${rows}</tbody></table></div><div style="font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#9A9388;margin-bottom:12px;">Checklist de Limpeza</div>${tarefas}`;
   }
   document.getElementById('cd-bd').innerHTML=body;
   document.getElementById('cal-dtl').classList.add('open');
 }
 
-const ICOS={Floors:'🧹',Shelving:'📦',Restrooms:'🚿',Exterior:'🌿',Equipment:'⚙️',Glass:'🪟',Stockroom:'🗃️',General:'✅'};
-function ico(c){return ICOS[c]||'✅';}
-function addTask(){
-  const n=document.getElementById('nt-n').value.trim();if(!n){alert('Enter a task description.');return;}
-  APP.tasks.push({id:Date.now(),name:n,cat:document.getElementById('nt-c').value,freq:document.getElementById('nt-f').value});
-  document.getElementById('nt-n').value='';sv();renderTasks();
+const ICOS_MAP={Chão:'🧹',Lineares:'📦',Sanitários:'🚿',Exterior:'🌿',Equipamentos:'⚙️',Vidros:'🪟',Armazém:'🗃️',Geral:'✅'};
+function icone(c){return ICOS_MAP[c]||'✅';}
+
+function adicionarTarefa(){
+  const n=document.getElementById('nt-n').value.trim(); if(!n){alert('Introduza a descrição da tarefa.');return;}
+  APP.tarefas.push({id:Date.now(),nome:n,cat:document.getElementById('nt-c').value,freq:document.getElementById('nt-f').value});
+  document.getElementById('nt-n').value=''; gravar(); renderTarefas();
 }
-function delTask(id){APP.tasks=APP.tasks.filter(t=>t.id!==id);sv();renderTasks();}
-function renderTasks(){
-  const el=document.getElementById('t-list');
-  document.getElementById('t-badge').textContent=APP.tasks.length+' task'+(APP.tasks.length!==1?'s':'');
-  if(!APP.tasks.length){el.innerHTML=`<div class="empty" style="padding:28px 0;"><div class="ei" style="font-size:26px;">📋</div><p>No tasks defined.</p></div>`;return;}
-  el.innerHTML=APP.tasks.map(t=>`<div class="ti"><div class="ti-ico">${ico(t.cat)}</div><div class="ti-info"><div class="ti-name">${t.name}</div><div class="ti-meta">${t.cat} · ${t.freq}</div></div><button class="btn btn-del btn-sm" onclick="delTask(${t.id})">Remove</button></div>`).join('');
+function eliminarTarefa(id){APP.tarefas=APP.tarefas.filter(t=>t.id!==id); gravar(); renderTarefas();}
+function renderTarefas(){
+  const el=document.getElementById('t-lista');
+  document.getElementById('t-badge').textContent=APP.tarefas.length+' tarefa'+(APP.tarefas.length!==1?'s':'');
+  if(!APP.tarefas.length){el.innerHTML=`<div class="empty" style="padding:28px 0;"><i class="ti ti-clipboard-list" style="font-size:28px;color:#D4D0C8;display:block;margin-bottom:10px;"></i><p>Sem tarefas definidas.</p></div>`;return;}
+  el.innerHTML=APP.tarefas.map(t=>`<div class="task-item"><div class="ti-ico">${icone(t.cat)}</div><div class="ti-info"><div class="ti-name">${t.nome}</div><div class="ti-meta">${t.cat} · ${t.freq}</div></div><button class="btn btn-danger btn-sm" onclick="eliminarTarefa(${t.id})"><i class="ti ti-trash" style="font-size:13px;"></i></button></div>`).join('');
 }
-function saveCfg(){APP.cfg.rest=+document.getElementById('cfg-rest').value;sv();}
+function guardarCfg(){APP.cfg.folga=+document.getElementById('cfg-rest').value; gravar();}
 function renderDir(){
   const q=(document.getElementById('dir-q')?.value||'').toLowerCase();
-  const list=q?DB.stores.filter(s=>s.name.toLowerCase().includes(q)||s.id.toLowerCase().includes(q)):DB.stores;
-  document.getElementById('dir-badge').textContent=list.length+' stores';
-  document.getElementById('dir-list').innerHTML=list.slice(0,100).map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--c2);"><div><span class="chip" style="margin-right:8px;">${s.id}</span><span style="font-size:13px;">${s.name}</span>${s.sup?`<div style="font-size:11px;color:var(--c4);margin-top:2px;">${toTC(s.sup)}</div>`:''}</div></div>`).join('')+(list.length>100?`<div style="padding:10px 16px;font-size:11px;color:var(--c4);">…and ${list.length-100} more</div>`:'');
+  const lista=q?DB.lojas.filter(l=>l.nome.toLowerCase().includes(q)||l.id.toLowerCase().includes(q)):DB.lojas;
+  document.getElementById('dir-badge').textContent=lista.length+' loja'+(lista.length!==1?'s':'');
+  document.getElementById('dir-lista').innerHTML=lista.slice(0,100).map(l=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #F0EDE6;"><span class="sid-chip">${l.id}</span><div><div style="font-size:13px;font-weight:500;">${l.nome}</div>${l.sup?`<div style="font-size:11px;color:#9A9388;">${toTitle(l.sup)}</div>`:''}</div></div>`).join('')+(lista.length>100?`<div style="padding:10px 16px;font-size:11px;color:#9A9388;">…e mais ${lista.length-100}</div>`:'');
 }
-function toTC(s){return s.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());}
+function toTitle(s){return s.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());}
 
-// INIT
-ld();initCal();
+/* INIT */
+carregar(); initCal();
 const _n=new Date();
 document.getElementById('sel-m').value=_n.getMonth();
 document.getElementById('ag-m').value=_n.getMonth();
-document.getElementById('cfg-rest').value=String(APP.cfg.rest);
-if(!APP.tasks.length){
-  APP.tasks=[
-    {id:1,name:'Sweep and mop all floor areas',cat:'Floors',freq:'Per visit'},
-    {id:2,name:'Dust and clean shelving units',cat:'Shelving',freq:'Per visit'},
-    {id:3,name:'Sanitise restrooms and restock',cat:'Restrooms',freq:'Per visit'},
-    {id:4,name:'Clean glass doors and windows',cat:'Glass',freq:'Weekly'},
-    {id:5,name:'Organise and clean stockroom',cat:'Stockroom',freq:'Weekly'},
-    {id:6,name:'Wipe checkout counters and equipment',cat:'Equipment',freq:'Per visit'},
-    {id:7,name:'Collect and sort waste',cat:'General',freq:'Daily'},
-    {id:8,name:'Clean exterior entrance',cat:'Exterior',freq:'Per visit'},
-  ];sv();
+document.getElementById('cfg-rest').value=String(APP.cfg.folga);
+if(!APP.tarefas.length){
+  APP.tarefas=[
+    {id:1,nome:'Varrer e lavar o chão de toda a loja',cat:'Chão',freq:'Por visita'},
+    {id:2,nome:'Limpeza e despoeiramento dos lineares',cat:'Lineares',freq:'Por visita'},
+    {id:3,nome:'Desinfeção dos sanitários e reposição de consumíveis',cat:'Sanitários',freq:'Por visita'},
+    {id:4,nome:'Limpeza de montras e portas de vidro',cat:'Vidros',freq:'Semanal'},
+    {id:5,nome:'Organização e limpeza do armazém',cat:'Armazém',freq:'Semanal'},
+    {id:6,nome:'Limpeza das caixas e equipamentos de balcão',cat:'Equipamentos',freq:'Por visita'},
+    {id:7,nome:'Recolha e separação de resíduos',cat:'Geral',freq:'Diária'},
+    {id:8,nome:'Limpeza do exterior e entrada da loja',cat:'Exterior',freq:'Por visita'},
+  ];
+  gravar();
 }
-renderTasks();
-reload();
+renderTarefas();
+recarregar();
 </script>
 </body>
 </html>
