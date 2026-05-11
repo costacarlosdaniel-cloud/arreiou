@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus Ops · Store Hygiene</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --c0:#ffffff;--c1:#f8f7f5;--c2:#edebe6;--c3:#d9d5cc;
+  --c4:#a09890;--c5:#5a5550;--c6:#2a2622;--c7:#0f0e0c;
+  --acc:#c49a3c;--acc2:#1a4a3a;--acc3:#2d6a8a;
+  --err:#8b2020;--ok:#1a5c3a;
+  --r4:4px;--r8:8px;--r12:12px;
+  --sh:0 1px 3px rgba(15,14,12,.06),0 4px 12px rgba(15,14,12,.08);
+  --sh2:0 2px 8px rgba(15,14,12,.08),0 12px 32px rgba(15,14,12,.12);
+  --tr:.18s ease;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:14px;}
+body{font-family:'Jost',sans-serif;background:var(--c1);color:var(--c6);min-height:100vh;line-height:1.55;-webkit-font-smoothing:antialiased;}
+
+/* BOOT */
+#boot{position:fixed;inset:0;z-index:9000;background:var(--c7);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .6s ease;}
+#boot.out{opacity:0;pointer-events:none;}
+.boot-wordmark{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:600;color:var(--c0);letter-spacing:2px;margin-bottom:6px;}
+.boot-sub{font-size:10px;font-weight:400;letter-spacing:4px;text-transform:uppercase;color:var(--c4);margin-bottom:40px;}
+.boot-bar{width:180px;height:1px;background:var(--c5);position:relative;overflow:hidden;}
+.boot-bar::after{content:'';position:absolute;left:-100%;top:0;width:100%;height:100%;background:var(--acc);animation:bootBar 1.6s ease infinite;}
+@keyframes bootBar{to{left:100%;}}
+.boot-msg{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--c5);margin-top:20px;}
+
+/* LAYOUT */
+.layout{display:flex;min-height:100vh;}
+.sidebar{width:220px;flex-shrink:0;background:var(--c7);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;border-right:1px solid rgba(255,255,255,.04);}
+.sidebar-logo{padding:32px 24px 28px;border-bottom:1px solid rgba(255,255,255,.06);}
+.s-wordmark{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--c0);letter-spacing:1px;}
+.s-sub{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--c4);margin-top:3px;}
+.sidebar-nav{flex:1;padding:20px 0;}
+.nav-sec{font-size:9px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--c5);padding:0 24px;margin:16px 0 8px;}
+.nv{display:flex;align-items:center;gap:12px;padding:10px 24px;font-size:13px;font-weight:400;color:var(--c4);cursor:pointer;border:none;background:none;width:100%;text-align:left;transition:color var(--tr),background var(--tr);font-family:'Jost',sans-serif;letter-spacing:.2px;position:relative;}
+.nv:hover{color:var(--c0);background:rgba(255,255,255,.04);}
+.nv.on{color:var(--c0);background:rgba(196,154,60,.1);}
+.nv.on::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--acc);}
+.nv-ico{font-size:15px;opacity:.7;}
+.nv.on .nv-ico{opacity:1;}
+.sidebar-footer{padding:20px 24px;border-top:1px solid rgba(255,255,255,.06);}
+.sync-row{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--c5);}
+.sdot{width:6px;height:6px;border-radius:50%;background:#4caf87;flex-shrink:0;}
+.sdot.spin{background:var(--acc);animation:blink .8s ease infinite;}
+.sdot.err{background:#e57373;animation:none;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* MAIN */
+.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;}
+.topbar{background:var(--c0);border-bottom:1px solid var(--c2);padding:0 40px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+.crumb{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--c4);}
+.crumb strong{color:var(--acc);font-weight:500;}
+.content{padding:36px 40px 64px;}
+
+/* PAGES */
+.page{display:none;}
+.page.on{display:block;animation:pIn .28s ease both;}
+@keyframes pIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* PAGE HEADER */
+.ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid var(--c2);}
+.ph h1{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:600;color:var(--c7);letter-spacing:-.3px;line-height:1.1;}
+.ph p{font-size:13px;color:var(--c4);margin-top:5px;font-weight:300;}
+.ph-ctrl{display:flex;gap:10px;align-items:flex-end;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:var(--r8);font-size:12px;font-weight:500;letter-spacing:.3px;font-family:'Jost',sans-serif;cursor:pointer;border:none;transition:all var(--tr);}
+.btn-ghost{background:transparent;color:var(--c5);border:1px solid var(--c3);}
+.btn-ghost:hover{border-color:var(--c5);color:var(--c6);}
+.btn-dark{background:var(--c7);color:var(--c0);}
+.btn-dark:hover{background:var(--c6);}
+.btn-gold{background:var(--acc);color:var(--c0);}
+.btn-gold:hover{background:#b08830;}
+.btn-sm{padding:6px 12px;font-size:11px;}
+.btn-del{background:#fbe9e9;color:var(--err);border:1px solid #f5c6c6;}
+.btn-del:hover{background:#f8d0d0;}
+
+/* FORMS */
+.fg{margin-bottom:16px;}
+.fl{display:block;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--c4);margin-bottom:7px;}
+select,input[type=text],input[type=date],textarea{width:100%;background:var(--c1);border:1px solid var(--c3);border-radius:var(--r8);padding:10px 13px;font-family:'Jost',sans-serif;font-size:13px;color:var(--c6);outline:none;transition:border-color var(--tr),box-shadow var(--tr);-webkit-appearance:none;}
+select:focus,input:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(196,154,60,.1);}
+
+/* KPIs */
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;}
+.kpi{background:var(--c0);border:1px solid var(--c2);border-radius:var(--r12);padding:22px 24px;box-shadow:var(--sh);position:relative;overflow:hidden;}
+.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--acc) 0%,transparent 100%);}
+.kpi-lbl{font-size:9px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--c4);margin-bottom:10px;}
+.kpi-val{font-family:'Cormorant Garamond',serif;font-size:38px;font-weight:700;color:var(--c7);line-height:1;}
+.kpi-val.ld{color:var(--c3);}
+.kpi-sub{font-size:11px;color:var(--c4);margin-top:7px;font-weight:300;}
+
+/* CARDS */
+.card{background:var(--c0);border:1px solid var(--c2);border-radius:var(--r12);box-shadow:var(--sh);overflow:hidden;}
+.card-hd{padding:15px 22px;border-bottom:1px solid var(--c2);display:flex;align-items:center;justify-content:space-between;}
+.card-ttl{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--c4);}
+.card-bd{padding:22px;}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:600;letter-spacing:.2px;}
+.bd-gold{background:#fef7e6;color:var(--acc);}
+.bd-teal{background:#e4f2ee;color:var(--acc2);}
+.bd-stone{background:var(--c2);color:var(--c5);}
+.bd-op1{background:#e8f0fe;color:#1a56cc;}
+.bd-op2{background:#e6f4ea;color:#137333;}
+
+/* SUPERVISOR CARDS */
+.sup-row{background:var(--c0);border:1px solid var(--c2);border-radius:var(--r12);margin-bottom:10px;box-shadow:var(--sh);overflow:hidden;transition:box-shadow var(--tr);}
+.sup-row:hover{box-shadow:var(--sh2);}
+.sup-hd{background:var(--c1);padding:14px 22px;border-bottom:1px solid var(--c2);display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.sup-name{font-size:14px;font-weight:500;color:var(--c7);letter-spacing:-.1px;}
+.sup-stores{font-size:11px;color:var(--c4);margin-top:3px;font-weight:300;}
+.sup-bd{padding:16px 22px;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+/* TABLE */
+.tw{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead tr{background:var(--c1);}
+th{text-align:left;padding:10px 16px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--c4);border-bottom:1px solid var(--c2);white-space:nowrap;}
+td{padding:13px 16px;border-bottom:1px solid var(--c2);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tbody tr{transition:background var(--tr);}
+tbody tr:hover td{background:var(--c1);}
+
+/* SCHEDULE WEEK GROUPS */
+.wk-hd{display:flex;align-items:center;gap:14px;margin-bottom:10px;margin-top:28px;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--c4);}
+.wk-hd::after{content:'';flex:1;height:1px;background:var(--c2);}
+.wk-hd:first-child{margin-top:0;}
+.chip{display:inline-flex;align-items:center;background:var(--c2);border-radius:var(--r4);padding:2px 8px;font-size:11px;font-weight:600;color:var(--c6);letter-spacing:.3px;}
+
+/* CALENDAR */
+.cal-nav{display:flex;align-items:center;gap:16px;}
+.cal-lbl{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;min-width:200px;text-align:center;color:var(--c7);}
+.cg{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cdl{text-align:center;padding:8px 0;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--c4);}
+.cc{background:var(--c0);border:1px solid var(--c2);border-radius:var(--r8);min-height:90px;padding:9px 8px;cursor:pointer;transition:border-color var(--tr),box-shadow var(--tr);}
+.cc:hover{border-color:var(--acc);box-shadow:0 2px 10px rgba(196,154,60,.15);}
+.cc.dim{opacity:.28;pointer-events:none;}
+.cc.rest{background:var(--c1);}
+.cc.tdy{border-color:var(--acc);}
+.cn{font-size:12px;font-weight:600;color:var(--c4);margin-bottom:5px;}
+.pip{display:block;font-size:10px;border-radius:3px;padding:2px 6px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pv{background:#e8f0fe;color:#1a56cc;}
+.pr{background:#fbe9e9;color:var(--err);}
+.cal-dtl{background:var(--c0);border:1px solid var(--c2);border-radius:var(--r12);box-shadow:var(--sh2);margin-top:16px;display:none;animation:su .22s ease both;}
+.cal-dtl.open{display:block;}
+@keyframes su{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.cd-hd{padding:16px 22px;border-bottom:1px solid var(--c2);display:flex;align-items:center;justify-content:space-between;}
+.cd-ttl{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--c7);}
+.cd-bd{padding:20px 22px;}
+
+/* TASKS */
+.ti{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--r8);border:1px solid var(--c2);margin-bottom:8px;background:var(--c1);transition:border-color var(--tr);}
+.ti:hover{border-color:var(--c3);}
+.ti-ico{font-size:17px;flex-shrink:0;}
+.ti-info{flex:1;}
+.ti-name{font-size:13px;font-weight:500;color:var(--c6);}
+.ti-meta{font-size:11px;color:var(--c4);margin-top:2px;}
+
+/* CONFIG */
+.cfi{display:flex;align-items:center;justify-content:space-between;padding:15px 0;border-bottom:1px solid var(--c2);}
+.cfi:last-child{border-bottom:none;}
+.cfl{font-size:13px;font-weight:500;}
+.cfd{font-size:11px;color:var(--c4);margin-top:2px;font-weight:300;}
+.cfc{flex-shrink:0;margin-left:20px;}
+.cfc select{width:150px;}
+
+/* EMPTY / ALERT */
+.empty{text-align:center;padding:60px 20px;}
+.ei{font-size:36px;margin-bottom:14px;opacity:.35;}
+.empty p{font-size:13px;color:var(--c4);font-weight:300;max-width:360px;margin:0 auto;}
+.alert-err{padding:13px 18px;border-radius:var(--r8);font-size:13px;margin-bottom:20px;background:#fbe9e9;border:1px solid #f5c6c6;color:var(--err);display:none;}
+
+/* GRIDS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+hr.dv{border:none;border-top:1px solid var(--c2);margin:20px 0;}
+
+@media(max-width:900px){
+  .sidebar{display:none;}.main{margin-left:0;}.content{padding:20px 16px 60px;}
+  .kpi-strip{grid-template-columns:1fr 1fr;}.g2{grid-template-columns:1fr;}
+  .sup-bd{grid-template-columns:1fr;}.ph{flex-direction:column;align-items:flex-start;gap:16px;}
+}
+</style>
+</head>
+<body>
+
+<div id="boot">
+  <div class="boot-wordmark">Nexus Ops</div>
+  <div class="boot-sub">Store Hygiene Management</div>
+  <div class="boot-bar"></div>
+  <div class="boot-msg" id="boot-msg">Connecting to data source…</div>
+</div>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="s-wordmark">Nexus Ops</div>
+      <div class="s-sub">Hygiene Management</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-sec">Programme</div>
+      <button class="nv on" onclick="go('selection',this)"><span class="nv-ico">◈</span> Selection</button>
+      <button class="nv" onclick="go('schedule',this)"><span class="nv-ico">≡</span> Schedule</button>
+      <button class="nv" onclick="go('calendar',this)"><span class="nv-ico">⊡</span> Calendar</button>
+      <div class="nav-sec">System</div>
+      <button class="nv" onclick="go('admin',this)"><span class="nv-ico">⚙</span> Administration</button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sync-row">
+        <span class="sdot" id="sdot"></span>
+        <span id="stxt">Synced</span>
+      </div>
+      <div style="margin-top:10px;">
+        <button class="btn btn-ghost btn-sm" style="color:var(--c4);border-color:rgba(255,255,255,.1);font-size:10px;width:100%;justify-content:center;" onclick="reload()">↻ Refresh data</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <span class="crumb" id="crumb">Programme · <strong>Selection</strong></span>
+      <span style="font-size:11px;color:var(--c4);letter-spacing:.5px;">GV <strong style="color:var(--acc);">Carlos Daniel Almeida Costa</strong></span>
+    </header>
+
+    <div class="content">
+
+      <!-- SELECTION -->
+      <div class="page on" id="page-selection">
+        <div class="ph">
+          <div>
+            <h1>Monthly Selection</h1>
+            <p>Assign an FT operator pair per supervisor for the cleaning programme.</p>
+          </div>
+          <div class="ph-ctrl">
+            <div class="fg" style="margin:0;">
+              <label class="fl">Month</label>
+              <select id="sel-m" onchange="renderSel()" style="width:120px;">
+                <option value="0">January</option><option value="1">February</option>
+                <option value="2">March</option><option value="3">April</option>
+                <option value="4">May</option><option value="5">June</option>
+                <option value="6">July</option><option value="7">August</option>
+                <option value="8">September</option><option value="9">October</option>
+                <option value="10">November</option><option value="11">December</option>
+              </select>
+            </div>
+            <div class="fg" style="margin:0;">
+              <label class="fl">Year</label>
+              <select id="sel-y" onchange="renderSel()" style="width:90px;">
+                <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
+              </select>
+            </div>
+            <div><button class="btn btn-gold" onclick="genSched()">⚡ Generate Schedule</button></div>
+          </div>
+        </div>
+        <div class="alert-err" id="sel-err"></div>
+        <div class="kpi-strip">
+          <div class="kpi"><div class="kpi-lbl">Stores · GV</div><div class="kpi-val ld" id="kv-s">—</div><div class="kpi-sub">Carlos Daniel A. Costa</div></div>
+          <div class="kpi"><div class="kpi-lbl">Supervisors</div><div class="kpi-val ld" id="kv-su">—</div><div class="kpi-sub">This cycle</div></div>
+          <div class="kpi"><div class="kpi-lbl">FT Operators</div><div class="kpi-val ld" id="kv-op">—</div><div class="kpi-sub">Eligible pool</div></div>
+          <div class="kpi"><div class="kpi-lbl">Pairs Assigned</div><div class="kpi-val" id="kv-pr">0</div><div class="kpi-sub" id="kv-pr-sub">of — supervisors</div></div>
+        </div>
+        <div id="sup-list"></div>
+      </div>
+
+      <!-- SCHEDULE -->
+      <div class="page" id="page-schedule">
+        <div class="ph">
+          <div><h1>Work Schedule</h1><p>Daily store assignments and team deployment.</p></div>
+          <div class="ph-ctrl">
+            <div class="fg" style="margin:0;"><label class="fl">Month</label>
+              <select id="ag-m" onchange="renderSched()" style="width:120px;">
+                <option value="0">January</option><option value="1">February</option><option value="2">March</option><option value="3">April</option><option value="4">May</option><option value="5">June</option><option value="6">July</option><option value="7">August</option><option value="8">September</option><option value="9">October</option><option value="10">November</option><option value="11">December</option>
+              </select>
+            </div>
+            <div class="fg" style="margin:0;"><label class="fl">Year</label>
+              <select id="ag-y" onchange="renderSched()" style="width:90px;"><option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option></select>
+            </div>
+            <div class="fg" style="margin:0;"><label class="fl">Search</label><input type="text" id="ag-q" placeholder="Store, operator…" oninput="renderSched()" style="width:190px;"></div>
+          </div>
+        </div>
+        <div id="sched-out"></div>
+      </div>
+
+      <!-- CALENDAR -->
+      <div class="page" id="page-calendar">
+        <div class="ph">
+          <div><h1>Calendar</h1><p>Monthly overview — click any day for detail.</p></div>
+          <div class="ph-ctrl">
+            <div class="cal-nav">
+              <button class="btn btn-ghost btn-sm" onclick="calShift(-1)">‹ Prev</button>
+              <span class="cal-lbl" id="cal-lbl"></span>
+              <button class="btn btn-ghost btn-sm" onclick="calShift(1)">Next ›</button>
+            </div>
+            <div style="display:flex;gap:14px;align-items:center;font-size:11px;color:var(--c4);">
+              <span style="display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:#1a56cc;display:inline-block;"></span>Visit</span>
+              <span style="display:flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--err);display:inline-block;"></span>Rest</span>
+            </div>
+          </div>
+        </div>
+        <div class="card"><div class="card-bd" style="padding:14px;">
+          <div class="cg" id="cal-hd"></div>
+          <div class="cg" style="margin-top:3px;" id="cal-bd"></div>
+        </div></div>
+        <div class="cal-dtl" id="cal-dtl">
+          <div class="cd-hd"><div class="cd-ttl" id="cd-ttl"></div><button class="btn btn-ghost btn-sm" onclick="closeDtl()">✕</button></div>
+          <div class="cd-bd" id="cd-bd"></div>
+        </div>
+      </div>
+
+      <!-- ADMIN -->
+      <div class="page" id="page-admin">
+        <div class="ph"><div><h1>Administration</h1><p>Cleaning tasks, programme rules and store directory.</p></div></div>
+        <div class="g2" style="align-items:start;">
+          <div class="card">
+            <div class="card-hd"><span class="card-ttl">Cleaning Tasks</span><span class="badge bd-stone" id="t-badge">0 tasks</span></div>
+            <div class="card-bd">
+              <div id="t-list"></div>
+              <hr class="dv">
+              <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--c4);margin-bottom:14px;">New Task</div>
+              <div class="fg"><label class="fl">Description</label><input type="text" id="nt-n" placeholder="e.g. Mop all floor areas"></div>
+              <div class="g2" style="gap:12px;">
+                <div class="fg" style="margin:0;"><label class="fl">Category</label>
+                  <select id="nt-c"><option value="Floors">🧹 Floors</option><option value="Shelving">📦 Shelving</option><option value="Restrooms">🚿 Restrooms</option><option value="Exterior">🌿 Exterior</option><option value="Equipment">⚙️ Equipment</option><option value="Glass">🪟 Glass</option><option value="Stockroom">🗃️ Stockroom</option><option value="General">✅ General</option></select>
+                </div>
+                <div class="fg" style="margin:0;"><label class="fl">Frequency</label>
+                  <select id="nt-f"><option>Per visit</option><option>Daily</option><option>Weekly</option></select>
+                </div>
+              </div>
+              <button class="btn btn-dark" style="width:100%;margin-top:12px;justify-content:center;" onclick="addTask()">+ Add Task</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:18px;">
+            <div class="card">
+              <div class="card-hd"><span class="card-ttl">Programme Configuration</span></div>
+              <div class="card-bd" style="padding:4px 22px 16px;">
+                <div class="cfi"><div><div class="cfl">Team size</div><div class="cfd">Fixed — 2 operators per visit</div></div><div class="cfc"><span class="badge bd-gold">2 Fixed</span></div></div>
+                <div class="cfi"><div><div class="cfl">Weekly rest day</div><div class="cfd">Day off for all cleaning teams</div></div><div class="cfc"><select id="cfg-rest" onchange="saveCfg()" style="width:140px;"><option value="0">Sunday</option><option value="6" selected>Saturday</option><option value="5">Friday</option></select></div></div>
+                <div class="cfi"><div><div class="cfl">Coverage model</div><div class="cfd">1 store per team per working day</div></div><div class="cfc"><span class="badge bd-teal">Sequential</span></div></div>
+                <div class="cfi"><div><div class="cfl">GV scope</div><div class="cfd">Filtered at source — Google Sheets live</div></div><div class="cfc"><span class="badge bd-gold">Carlos Daniel</span></div></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-hd"><span class="card-ttl">Store Directory</span><span class="badge bd-stone" id="dir-badge">—</span></div>
+              <div class="card-bd" style="padding:0;">
+                <div style="padding:12px 16px;border-bottom:1px solid var(--c2);"><input type="text" id="dir-q" placeholder="Filter stores…" oninput="renderDir()"></div>
+                <div style="max-height:340px;overflow-y:auto;" id="dir-list"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const SHEET_ID='1ybnb1bMtRxwgcn6OL5fsZ6lD8XBkpXjY';
+const GV_FILTER='CARLOS DANIEL ALMEIDA COSTA';
+const gviz=s=>`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(s)}`;
+
+let DB={stores:[],operators:[]};
+let APP={sels:{},tasks:[],sched:{},cfg:{rest:6}};
+const mk=(m,y)=>`${y}-${String(+m+1).padStart(2,'0')}`;
+const sv=()=>{try{localStorage.setItem('nxops4',JSON.stringify(APP));}catch(e){}};
+const ld=()=>{try{const s=localStorage.getItem('nxops4');if(s)APP=JSON.parse(s);}catch(e){}};
+
+async function fetchGviz(sheet){
+  const r=await fetch(gviz(sheet));
+  if(!r.ok)throw new Error(`HTTP ${r.status} — "${sheet}"`);
+  const txt=await r.text();
+  const json=JSON.parse(txt.replace(/^[^(]+\(/,'').replace(/\);\s*$/,''));
+  const cols=json.table.cols.map(c=>c.label||c.id);
+  return(json.table.rows||[]).map(row=>{
+    const o={};
+    cols.forEach((c,i)=>{const cell=row.c&&row.c[i];o[c]=cell&&cell.v!=null?String(cell.v):'';});
+    return o;
+  });
+}
+
+async function reload(){
+  setSy('spin','Syncing…');bMsg('Fetching store directory…');
+  try{
+    const sr=await fetchGviz('SalesKPIsStore 2');
+    DB.stores=sr.filter(r=>(r['Dim Lojas[Nome GV]']||'').trim().toUpperCase()===GV_FILTER&&(r['Dim Lojas[LOJA]']||'').trim())
+      .map(r=>({id:(r['Dim Centros[Nro Centro (#)]']||'').trim(),name:(r['Dim Lojas[LOJA]']||'').trim(),sup:(r['Dim Lojas[Nome Supervisor]']||'').trim()}));
+    bMsg('Fetching operator headcount…');
+    const hr=await fetchGviz('HeadcountReport2025');
+    DB.operators=hr.filter(r=>(r['File HC Atual[Regime]']||'').trim()==='FT'&&(r['File HC Atual[Descritivo da Função]']||'').trim()==='Operador de loja')
+      .map(r=>({id:String(r['File HC Atual[Nº pessoal]']||'').trim(),name:(r['File HC Atual[Nome]']||'').trim()}));
+    setSy('ok','Live');hideBoot();afterLoad();
+  }catch(e){
+    console.error(e);setSy('err','Error');hideBoot();
+    const el=document.getElementById('sel-err');
+    el.textContent=`Cannot load from Google Sheets: ${e.message}. Make sure the spreadsheet is shared publicly (Anyone with the link → Viewer) and published to web (File → Share → Publish to web).`;
+    el.style.display='block';
+  }
+}
+
+function afterLoad(){updKPIs();renderSel();renderDir();renderSched();renderCal();}
+function bMsg(t){document.getElementById('boot-msg').textContent=t;}
+function hideBoot(){setTimeout(()=>{const b=document.getElementById('boot');b.classList.add('out');setTimeout(()=>b.style.display='none',700);},300);}
+function setSy(st,txt){const d=document.getElementById('sdot'),t=document.getElementById('stxt');d.className='sdot'+(st==='spin'?' spin':st==='err'?' err':'');t.textContent=txt;}
+
+const CRUMBS={selection:'Selection',schedule:'Schedule',calendar:'Calendar',admin:'Administration'};
+function go(page,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nv').forEach(b=>b.classList.remove('on'));
+  document.getElementById('page-'+page).classList.add('on');
+  btn.classList.add('on');
+  document.getElementById('crumb').innerHTML=`Programme · <strong>${CRUMBS[page]}</strong>`;
+  if(page==='schedule'){syncSM();renderSched();}
+  if(page==='calendar')renderCal();
+  if(page==='admin'){renderTasks();renderDir();}
+}
+
+function updKPIs(){
+  const su=getSups();
+  ['kv-s','kv-su','kv-op'].forEach(id=>document.getElementById(id).classList.remove('ld'));
+  document.getElementById('kv-s').textContent=DB.stores.length;
+  document.getElementById('kv-su').textContent=su.length;
+  document.getElementById('kv-op').textContent=DB.operators.length;
+  document.getElementById('kv-pr-sub').textContent=`of ${su.length} supervisors`;
+  updPairs();
+}
+function updPairs(){
+  const m=document.getElementById('sel-m')?.value??new Date().getMonth();
+  const y=document.getElementById('sel-y')?.value??new Date().getFullYear();
+  const key=mk(m,y);const su=getSups();
+  document.getElementById('kv-pr').textContent=su.filter(s=>APP.sels[key]?.[s]?.op1&&APP.sels[key]?.[s]?.op2).length;
+}
+
+function getSups(){return[...new Set(DB.stores.map(s=>s.sup).filter(Boolean))].sort();}
+function getBS(sup){return DB.stores.filter(s=>s.sup===sup);}
+
+function renderSel(){
+  const m=document.getElementById('sel-m')?.value??new Date().getMonth();
+  const y=document.getElementById('sel-y')?.value??new Date().getFullYear();
+  const key=mk(m,y);if(!APP.sels[key])APP.sels[key]={};
+  const su=getSups();updPairs();
+  if(!su.length){
+    document.getElementById('sup-list').innerHTML=`<div class="card"><div class="card-bd"><div class="empty"><div class="ei">📡</div><p>No data loaded. Use <strong>Refresh data</strong> in the sidebar.</p></div></div></div>`;return;
+  }
+  const opts=sel=>`<option value="">— Select operator —</option>`+DB.operators.map(o=>`<option value="${o.id}"${sel===o.id?' selected':''}>${o.name}</option>`).join('');
+  document.getElementById('sup-list').innerHTML=su.map(sup=>{
+    const stores=getBS(sup),s=APP.sels[key][sup]||{op1:'',op2:''},done=s.op1&&s.op2;
+    const prev=stores.slice(0,5).map(x=>x.id).join(', ')+(stores.length>5?` +${stores.length-5}`:'');
+    return`<div class="sup-row">
+      <div class="sup-hd">
+        <div><div class="sup-name">${toTC(sup)}</div><div class="sup-stores">${stores.length} store${stores.length!==1?'s':''} — ${prev}</div></div>
+        ${done?'<span class="badge bd-teal">✓ Pair assigned</span>':'<span class="badge bd-stone">Pending</span>'}
+      </div>
+      <div class="sup-bd">
+        <div class="fg" style="margin:0;"><label class="fl">Operator 1</label><select onchange="saveSel('${key}','${sup}','op1',this.value)">${opts(s.op1)}</select></div>
+        <div class="fg" style="margin:0;"><label class="fl">Operator 2</label><select onchange="saveSel('${key}','${sup}','op2',this.value)">${opts(s.op2)}</select></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function saveSel(key,sup,f,v){
+  if(!APP.sels[key])APP.sels[key]={};
+  if(!APP.sels[key][sup])APP.sels[key][sup]={op1:'',op2:''};
+  APP.sels[key][sup][f]=v;sv();updPairs();
+}
+
+function genSched(){
+  const m=document.getElementById('sel-m').value,y=document.getElementById('sel-y').value;
+  const key=mk(m,y),sels=APP.sels[key]||{},rest=+APP.cfg.rest;
+  const entries=[];
+  getSups().forEach(sup=>{
+    const s=sels[sup]||{};if(!s.op1||!s.op2)return;
+    const stores=getBS(sup);if(!stores.length)return;
+    const dim=new Date(+y,+m+1,0).getDate(),wd=[];
+    for(let d=1;d<=dim;d++)if(new Date(+y,+m,d).getDay()!==rest)wd.push(d);
+    wd.forEach((day,i)=>{const st=stores[i%stores.length];entries.push({date:`${y}-${String(+m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`,sup,op1:s.op1,op2:s.op2,sid:st.id,sname:st.name});});
+  });
+  APP.sched[key]=entries;sv();
+  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  alert(`Schedule generated — ${entries.length} visits across ${MN[m]} ${y}.`);
+}
+
+function syncSM(){document.getElementById('ag-m').value=document.getElementById('sel-m').value;document.getElementById('ag-y').value=document.getElementById('sel-y').value;}
+function opN(id){const o=DB.operators.find(x=>x.id===id);return o?o.name:id;}
+function opS(id){const n=opN(id).split(' ');return n[0]+' '+n[n.length-1];}
+
+function renderSched(){
+  const m=document.getElementById('ag-m')?.value??new Date().getMonth();
+  const y=document.getElementById('ag-y')?.value??new Date().getFullYear();
+  const key=mk(m,y),ents=APP.sched[key]||[],q=(document.getElementById('ag-q')?.value||'').toLowerCase();
+  const el=document.getElementById('sched-out');
+  if(!ents.length){el.innerHTML=`<div class="card"><div class="card-bd"><div class="empty"><div class="ei">📅</div><p>No schedule for this month.<br>Go to <strong>Selection</strong>, assign pairs, then <strong>Generate Schedule</strong>.</p></div></div></div>`;return;}
+  let list=q?ents.filter(e=>e.sname.toLowerCase().includes(q)||opN(e.op1).toLowerCase().includes(q)||opN(e.op2).toLowerCase().includes(q)||e.sup.toLowerCase().includes(q)):ents;
+  const wks={};
+  list.forEach(e=>{const d=new Date(e.date+'T12:00:00'),wk=isoWk(d);(wks[wk]=wks[wk]||[]).push(e);});
+  const DA=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],MS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let html=`<div style="font-size:12px;color:var(--c4);margin-bottom:20px;">${list.length} visit${list.length!==1?'s':''} scheduled${q?' (filtered)':''}</div>`;
+  Object.keys(wks).sort((a,b)=>+a-+b).forEach(wk=>{
+    const we=wks[wk],f=new Date(we[0].date+'T12:00:00'),l=new Date(we[we.length-1].date+'T12:00:00');
+    html+=`<div class="wk-hd">Week ${wk} · ${f.getDate()} ${MS[f.getMonth()]} — ${l.getDate()} ${MS[l.getMonth()]}</div>
+    <div class="card" style="margin-bottom:0;"><div class="tw"><table>
+      <thead><tr><th>Date</th><th>Store</th><th>Supervisor</th><th>Operator 1</th><th>Operator 2</th><th>Tasks</th></tr></thead>
+      <tbody>${we.map(e=>{const d=new Date(e.date+'T12:00:00');return`<tr>
+        <td><strong>${DA[d.getDay()]}</strong> <span style="color:var(--c4);">${d.getDate()}/${d.getMonth()+1}</span></td>
+        <td><span class="chip">${e.sid}</span> <span style="color:var(--c4);font-size:12px;margin-left:6px;">${e.sname}</span></td>
+        <td style="font-size:12px;color:var(--c4);">${toTC(e.sup)}</td>
+        <td><span class="badge bd-op1">${opS(e.op1)}</span></td>
+        <td><span class="badge bd-op2">${opS(e.op2)}</span></td>
+        <td style="font-size:11px;color:var(--c4);">${APP.tasks.length}</td>
+      </tr>`;}).join('')}</tbody>
+    </table></div></div>`;
+  });
+  el.innerHTML=html;
+}
+function isoWk(d){const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),day=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-day);const y1=new Date(Date.UTC(dt.getUTCFullYear(),0,1));return Math.ceil((((dt-y1)/86400000)+1)/7);}
+
+let calY,calM;
+function initCal(){const n=new Date();calY=n.getFullYear();calM=n.getMonth();}
+function calShift(d){calM+=d;if(calM<0){calM=11;calY--;}if(calM>11){calM=0;calY++;}renderCal();}
+function closeDtl(){document.getElementById('cal-dtl').classList.remove('open');}
+
+function renderCal(){
+  const key=mk(calM,calY),ents=APP.sched[key]||[],rest=+APP.cfg.rest;
+  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-lbl').textContent=`${MN[calM]} ${calY}`;
+  const dm={};ents.forEach(e=>{const d=+e.date.split('-')[2];(dm[d]=dm[d]||[]).push(e);});
+  const fd=new Date(calY,calM,1).getDay(),dim=new Date(calY,calM+1,0).getDate(),pd=new Date(calY,calM,0).getDate(),td=new Date();
+  document.getElementById('cal-hd').innerHTML=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cdl">${d}</div>`).join('');
+  let cells='';
+  for(let i=fd-1;i>=0;i--)cells+=`<div class="cc dim"><div class="cn">${pd-i}</div></div>`;
+  for(let d=1;d<=dim;d++){
+    const dow=new Date(calY,calM,d).getDay(),isR=dow===rest,isT=td.getFullYear()===calY&&td.getMonth()===calM&&td.getDate()===d,de=dm[d]||[];
+    let pips=isR?`<span class="pip pr">Rest day</span>`:'';
+    if(!isR){de.slice(0,3).forEach(e=>pips+=`<span class="pip pv" title="${e.sname}">${e.sid}</span>`);if(de.length>3)pips+=`<span style="font-size:9px;color:var(--c4)">+${de.length-3}</span>`;}
+    cells+=`<div class="cc${isR?' rest':''}${isT?' tdy':''}" onclick="calDtl(${d})"><div class="cn">${isT?`<div style="background:var(--acc);color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;">${d}</div>`:d}</div>${pips}</div>`;
+  }
+  const tot=Math.ceil((fd+dim)/7)*7;
+  for(let nd=1;nd<=tot-fd-dim;nd++)cells+=`<div class="cc dim"><div class="cn">${nd}</div></div>`;
+  document.getElementById('cal-bd').innerHTML=cells;
+}
+
+function calDtl(day){
+  const key=mk(calM,calY),ents=(APP.sched[key]||[]).filter(e=>+e.date.split('-')[2]===day);
+  const dow=new Date(calY,calM,day).getDay(),isR=dow===+APP.cfg.rest;
+  const DA2=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const MS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('cd-ttl').textContent=`${DA2[dow]}, ${day} ${MS[calM]} ${calY}`;
+  let body='';
+  if(isR){body=`<div class="empty"><div class="ei">🔴</div><p>Rest day — no visits.</p></div>`;}
+  else if(!ents.length){body=`<div class="empty"><div class="ei">📭</div><p>No visits on this day. Generate a schedule from <strong>Selection</strong>.</p></div>`;}
+  else{
+    const rows=ents.map(e=>`<tr><td><span class="chip">${e.sid}</span></td><td>${e.sname}</td><td style="font-size:12px;color:var(--c4);">${toTC(e.sup)}</td><td><span class="badge bd-op1">${opS(e.op1)}</span></td><td><span class="badge bd-op2">${opS(e.op2)}</span></td></tr>`).join('');
+    const tasks=APP.tasks.map(t=>`<div class="ti"><div class="ti-ico">${ico(t.cat)}</div><div class="ti-info"><div class="ti-name">${t.name}</div><div class="ti-meta">${t.cat} · ${t.freq}</div></div><input type="checkbox" style="accent-color:var(--acc);width:16px;height:16px;"></div>`).join('')||`<p style="font-size:12px;color:var(--c4);">No tasks defined. Add in <strong>Administration</strong>.</p>`;
+    body=`<div class="tw" style="margin-bottom:20px;"><table><thead><tr><th>ID</th><th>Store</th><th>Supervisor</th><th>Op 1</th><th>Op 2</th></tr></thead><tbody>${rows}</tbody></table></div><div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--c4);margin-bottom:12px;">Checklist</div>${tasks}`;
+  }
+  document.getElementById('cd-bd').innerHTML=body;
+  document.getElementById('cal-dtl').classList.add('open');
+}
+
+const ICOS={Floors:'🧹',Shelving:'📦',Restrooms:'🚿',Exterior:'🌿',Equipment:'⚙️',Glass:'🪟',Stockroom:'🗃️',General:'✅'};
+function ico(c){return ICOS[c]||'✅';}
+function addTask(){
+  const n=document.getElementById('nt-n').value.trim();if(!n){alert('Enter a task description.');return;}
+  APP.tasks.push({id:Date.now(),name:n,cat:document.getElementById('nt-c').value,freq:document.getElementById('nt-f').value});
+  document.getElementById('nt-n').value='';sv();renderTasks();
+}
+function delTask(id){APP.tasks=APP.tasks.filter(t=>t.id!==id);sv();renderTasks();}
+function renderTasks(){
+  const el=document.getElementById('t-list');
+  document.getElementById('t-badge').textContent=APP.tasks.length+' task'+(APP.tasks.length!==1?'s':'');
+  if(!APP.tasks.length){el.innerHTML=`<div class="empty" style="padding:28px 0;"><div class="ei" style="font-size:26px;">📋</div><p>No tasks defined.</p></div>`;return;}
+  el.innerHTML=APP.tasks.map(t=>`<div class="ti"><div class="ti-ico">${ico(t.cat)}</div><div class="ti-info"><div class="ti-name">${t.name}</div><div class="ti-meta">${t.cat} · ${t.freq}</div></div><button class="btn btn-del btn-sm" onclick="delTask(${t.id})">Remove</button></div>`).join('');
+}
+function saveCfg(){APP.cfg.rest=+document.getElementById('cfg-rest').value;sv();}
+function renderDir(){
+  const q=(document.getElementById('dir-q')?.value||'').toLowerCase();
+  const list=q?DB.stores.filter(s=>s.name.toLowerCase().includes(q)||s.id.toLowerCase().includes(q)):DB.stores;
+  document.getElementById('dir-badge').textContent=list.length+' stores';
+  document.getElementById('dir-list').innerHTML=list.slice(0,100).map(s=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--c2);"><div><span class="chip" style="margin-right:8px;">${s.id}</span><span style="font-size:13px;">${s.name}</span>${s.sup?`<div style="font-size:11px;color:var(--c4);margin-top:2px;">${toTC(s.sup)}</div>`:''}</div></div>`).join('')+(list.length>100?`<div style="padding:10px 16px;font-size:11px;color:var(--c4);">…and ${list.length-100} more</div>`:'');
+}
+function toTC(s){return s.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());}
+
+// INIT
+ld();initCal();
+const _n=new Date();
+document.getElementById('sel-m').value=_n.getMonth();
+document.getElementById('ag-m').value=_n.getMonth();
+document.getElementById('cfg-rest').value=String(APP.cfg.rest);
+if(!APP.tasks.length){
+  APP.tasks=[
+    {id:1,name:'Sweep and mop all floor areas',cat:'Floors',freq:'Per visit'},
+    {id:2,name:'Dust and clean shelving units',cat:'Shelving',freq:'Per visit'},
+    {id:3,name:'Sanitise restrooms and restock',cat:'Restrooms',freq:'Per visit'},
+    {id:4,name:'Clean glass doors and windows',cat:'Glass',freq:'Weekly'},
+    {id:5,name:'Organise and clean stockroom',cat:'Stockroom',freq:'Weekly'},
+    {id:6,name:'Wipe checkout counters and equipment',cat:'Equipment',freq:'Per visit'},
+    {id:7,name:'Collect and sort waste',cat:'General',freq:'Daily'},
+    {id:8,name:'Clean exterior entrance',cat:'Exterior',freq:'Per visit'},
+  ];sv();
+}
+renderTasks();
+reload();
+</script>
+</body>
+</html>
