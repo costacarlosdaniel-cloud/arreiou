@@ -615,7 +615,13 @@ hr.sep { border: none; border-top: 1px solid #E8E4DC; margin: 18px 0; }
 <script>
 const SHEET_ID = '1ybnb1bMtRxwgcn6OL5fsZ6lD8XBkpXjY';
 const GV       = 'CARLOS DANIEL ALMEIDA COSTA';
-const gvizURL  = s => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(s)}`;
+
+// GIDs visíveis na URL do Google Sheets (gid=XXXXXXX)
+const GID_LOJAS = '1040571586';   // aba SalesKPIsStore 2
+const GID_HC    = '1479810635';   // aba HeadcountReport2025
+
+// Usar CSV export — mais fiável que gviz/tq para labels com caracteres especiais
+const csvURL = gid => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
 
 let DB  = { lojas:[], operadores:[] };
 let APP = { sels:{}, tarefas:[], agenda:{}, cfg:{ folga:6 } };
@@ -624,51 +630,123 @@ const mk  = (m,a) => `${a}-${String(+m+1).padStart(2,'0')}`;
 const gravar = () => { try{localStorage.setItem('opsclean1',JSON.stringify(APP));}catch(e){} };
 const carregar = () => { try{const s=localStorage.getItem('opsclean1');if(s)APP=JSON.parse(s);}catch(e){} };
 
-async function fetchSheet(nome) {
-  const r = await fetch(gvizURL(nome));
-  if (!r.ok) throw new Error(`HTTP ${r.status} — "${nome}"`);
-  const txt = await r.text();
-  const json = JSON.parse(txt.replace(/^[^(]+\(/,'').replace(/\);\s*$/,''));
-  const cols = json.table.cols.map(c => c.label || c.id);
-  return (json.table.rows||[]).map(row => {
-    const o={};
-    cols.forEach((c,i)=>{ const cell=row.c&&row.c[i]; o[c]=cell&&cell.v!=null?String(cell.v):''; });
-    return o;
+// Parser CSV robusto (lida com vírgulas dentro de aspas)
+function parseCSV(txt) {
+  const lines = txt.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim());
+  if (lines.length < 2) return [];
+  const parseLine = line => {
+    const fields = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { if (inQ && line[i+1]==='"') { cur+='"'; i++; } else { inQ=!inQ; } }
+      else if (ch === ',' && !inQ) { fields.push(cur); cur=''; }
+      else { cur+=ch; }
+    }
+    fields.push(cur);
+    return fields.map(f=>f.trim());
+  };
+  const headers = parseLine(lines[0]);
+  return lines.slice(1).map(l => {
+    const vals = parseLine(l);
+    const obj = {};
+    headers.forEach((h,i) => { obj[h] = (vals[i]||'').trim(); });
+    return obj;
   });
+}
+
+async function fetchCSV(gid, nomeDebug) {
+  const url = csvURL(gid);
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status} ao carregar "${nomeDebug}"`);
+  const txt = await r.text();
+  const rows = parseCSV(txt);
+  // Debug: mostrar as colunas da primeira linha para diagnosticar
+  if (rows.length > 0) {
+    console.log(`[${nomeDebug}] Colunas encontradas:`, Object.keys(rows[0]));
+    console.log(`[${nomeDebug}] Primeira linha:`, rows[0]);
+    console.log(`[${nomeDebug}] Total de linhas:`, rows.length);
+  }
+  return rows;
 }
 
 async function recarregar() {
   setSync('spin','A sincronizar…');
   setMsg('A carregar diretório de lojas…');
+
+  // Limpar erro anterior
+  const elErr = document.getElementById('sel-err');
+  elErr.style.display = 'none';
+
   try {
-    const sr = await fetchSheet('SalesKPIsStore 2');
-    DB.lojas = sr
-      .filter(r => (r['Dim Lojas[Nome GV]']||'').trim().toUpperCase()===GV && (r['Dim Lojas[LOJA]']||'').trim())
-      .map(r => ({
-        id:   (r['Dim Centros[Nro Centro (#)]']||'').trim(),
-        nome: (r['Dim Lojas[LOJA]']||'').trim(),
-        sup:  (r['Dim Lojas[Nome Supervisor]']||'').trim()
-      }));
+    // ── LOJAS (SalesKPIsStore 2) ──
+    const sr = await fetchCSV(GID_LOJAS, 'SalesKPIsStore 2');
+
+    // Detectar automaticamente os nomes das colunas (podem variar ligeiramente)
+    const primeiraLinha = sr[0] || {};
+    const todasCols = Object.keys(primeiraLinha);
+
+    // Encontrar colunas por substring (insensível a maiúsculas)
+    const findCol = (substr) => todasCols.find(c => c.toLowerCase().includes(substr.toLowerCase())) || '';
+    const colID   = findCol('Nro Centro') || findCol('Centro');
+    const colLoja = findCol('LOJA');
+    const colGV   = findCol('Nome GV');
+    const colSup  = findCol('Nome Supervisor');
+
+    console.log('[Lojas] Mapeamento de colunas:', { colID, colLoja, colGV, colSup });
+
+    DB.lojas = sr.filter(r => {
+      const gvVal = (r[colGV]||'').trim().toUpperCase();
+      const lojaVal = (r[colLoja]||'').trim();
+      return gvVal === GV && lojaVal;
+    }).map(r => ({
+      id:   (r[colID]||'').trim(),
+      nome: (r[colLoja]||'').trim(),
+      sup:  (r[colSup]||'').trim(),
+      gv:   (r[colGV]||'').trim()
+    }));
+
+    console.log(`[Lojas] Lojas do GV "${GV}":`, DB.lojas.length, DB.lojas.slice(0,3));
 
     setMsg('A carregar headcount de operadores…');
-    const hr = await fetchSheet('HeadcountReport2025');
-    DB.operadores = hr
-      .filter(r => (r['File HC Atual[Regime]']||'').trim()==='FT' && (r['File HC Atual[Descritivo da Função]']||'').trim()==='Operador de loja')
-      .map(r => ({
-        id:   String(r['File HC Atual[Nº pessoal]']||'').trim(),
-        nome: (r['File HC Atual[Nome]']||'').trim()
-      }));
+
+    // ── HEADCOUNT (HeadcountReport2025) ──
+    const hr = await fetchCSV(GID_HC, 'HeadcountReport2025');
+
+    const hCols    = Object.keys(hr[0]||{});
+    const colRegime = hCols.find(c=>c.toLowerCase().includes('regime')) || '';
+    const colFuncao = hCols.find(c=>c.toLowerCase().includes('descritivo') || c.toLowerCase().includes('fun')) || '';
+    const colNpess  = hCols.find(c=>c.toLowerCase().includes('pessoal') || c.toLowerCase().includes('n') && c.toLowerCase().includes('pessoal')) || '';
+    const colNome   = hCols.find(c=>c.toLowerCase().includes('nome') && !c.toLowerCase().includes('gv') && !c.toLowerCase().includes('supervisor')) || '';
+
+    console.log('[HC] Mapeamento de colunas:', { colRegime, colFuncao, colNpess, colNome });
+    console.log('[HC] Amostra de valores de regime:', hr.slice(0,5).map(r=>r[colRegime]));
+    console.log('[HC] Amostra de valores de função:', hr.slice(0,5).map(r=>r[colFuncao]));
+
+    DB.operadores = hr.filter(r => {
+      const reg  = (r[colRegime]||'').trim().toUpperCase();
+      const func = (r[colFuncao]||'').trim().toLowerCase();
+      return reg === 'FT' && func.includes('operador de loja');
+    }).map(r => ({
+      id:   (r[colNpess]||'').trim(),
+      nome: (r[colNome]||'').trim()
+    }));
+
+    console.log('[Operadores] Total FT Operador de loja:', DB.operadores.length);
 
     setSync('ok','Sincronizado');
     esconderBoot();
     aposCarregar();
+
   } catch(e) {
-    console.error(e);
+    console.error('[recarregar] Erro:', e);
     setSync('err','Erro');
     esconderBoot();
-    const el = document.getElementById('sel-err');
-    el.textContent = `Não foi possível carregar do Google Sheets: ${e.message}. Certifique-se que a folha está partilhada publicamente (Qualquer pessoa com o link → Leitor) e publicada na web (Ficheiro → Partilhar → Publicar na web).`;
-    el.style.display = 'block';
+    elErr.innerHTML = `<strong>Erro ao carregar dados:</strong> ${e.message}<br><br>
+      Verifique no Google Sheets:<br>
+      1. <em>Ficheiro → Partilhar → Publicar na web</em> (ativar publicação)<br>
+      2. A folha deve estar partilhada como "Qualquer pessoa com o link → Leitor"<br><br>
+      Abra a consola do browser (F12) para ver detalhes técnicos.`;
+    elErr.style.display = 'block';
   }
 }
 
