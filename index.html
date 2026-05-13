@@ -1402,10 +1402,7 @@ function criarOpWidget(uid,label,valorInicial,cb){
       <div class="op-drop" id="drop-${uid}">
         <div class="op-drop-search">
           <i class="ti ti-search"></i>
-          <input id="srch-${uid}" type="text" placeholder="Nome ou nº colaborador…"
-            
-            
-            autocomplete="off">
+          <input id="srch-${uid}" type="text" placeholder="Nome ou nº colaborador…" data-srch-op="${uid}" autocomplete="off">
         </div>
         <div class="op-list" id="list-${uid}"></div>
       </div>
