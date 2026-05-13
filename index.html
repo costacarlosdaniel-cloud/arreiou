@@ -932,6 +932,20 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
           <div class="kpi"><div class="kpi-lbl">Pares OK</div><div class="kpi-val" id="kv-p">0</div><div class="kpi-sub" id="kv-ps">de — sup.</div></div>
         </div>
 
+        <!-- Equipas de supervisores -->
+        <div id="equipas-section" style="margin-bottom:24px;">
+          <div class="card">
+            <div class="card-hd" style="flex-wrap:wrap;gap:8px;">
+              <span class="card-ttl">Equipas de Supervisores</span>
+              <span class="bdg bdg-stone" id="eq-badge">0 equipas</span>
+              <button class="btn btn-gold btn-sm" style="margin-left:auto;" onclick="window.adicionarEquipa&&window.adicionarEquipa()"><i class="ti ti-plus"></i> Nova Equipa</button>
+            </div>
+            <div class="card-bd" style="padding:0;">
+              <div id="eq-lista" style="padding:12px 18px;"></div>
+            </div>
+          </div>
+        </div>
+
         <div id="sup-lista"></div>
       </div>
 
@@ -1328,7 +1342,7 @@ async function recarregar(forcarSheets = false) {
 /* ── Botão "Atualizar dados" força re-fetch do Sheets ── */
 window._recarregarForcar = () => recarregar(true);
 
-function aposCarregar(){atualizarKPIs();renderSel();renderDir();renderAgenda();renderCal();}
+function aposCarregar(){atualizarKPIs();renderSel();renderEquipas();renderDir();renderAgenda();renderCal();}
 function setMsg(t){document.getElementById('boot-msg').textContent=t;}
 function esconderBoot(){setTimeout(()=>{const b=document.getElementById('boot');b.classList.add('hide');setTimeout(()=>b.style.display='none',600);},200);}
 function setSync(st,txt){
@@ -1350,6 +1364,7 @@ function go(pag, btn) {
   if(pag==='agenda'){syncMesAgenda();renderAgenda();}
   if(pag==='calendario')renderCal();
   if(pag==='administracao'){renderTarefas();renderDir();renderPinAdmin();}
+  if(pag==='selecao')renderEquipas();
   // Show/hide mobile filter btn
   document.getElementById('ag-fil-mob-btn').style.display = pag==='agenda'?'flex':'none';
 }
@@ -1553,17 +1568,164 @@ function guardarSel(key,sup,f,v){
   APP.sels[key][sup][f]=v;gravar();atualizarPares();
 }
 
+/* ════════════════════════════════════════
+   EQUIPAS
+════════════════════════════════════════ */
+function getEquipas(){ return APP.equipas||[]; }
+
+function renderEquipas(){
+  const eqs=getEquipas();
+  const badge=document.getElementById('eq-badge');
+  if(badge) badge.textContent=eqs.length+' equipa'+(eqs.length!==1?'s':'');
+  const el=document.getElementById('eq-lista');
+  if(!el)return;
+  const sups=getSups();
+  if(!eqs.length){
+    el.innerHTML='<div style="font-size:13px;color:var(--muted);padding:4px 0;">Sem equipas definidas — os supervisores trabalham de forma independente.</div>';
+    return;
+  }
+  el.innerHTML=eqs.map((eq,i)=>{
+    const nomes=eq.sups.map(s=>toTitle(s)).join(' + ');
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border2);">
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;color:var(--ink);">${nomes}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${eq.sups.length} supervisores · ${eq.sups.reduce((t,s)=>t+getLojasSup(s).length,0)} lojas combinadas</div>
+      </div>
+      <button onclick="window.editarEquipa&&window.editarEquipa(${i})" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;"><i class="ti ti-edit"></i></button>
+      <button onclick="window.removerEquipa&&window.removerEquipa(${i})" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--red);cursor:pointer;"><i class="ti ti-trash"></i></button>
+    </div>`;
+  }).join('');
+}
+
+function adicionarEquipa(){
+  abrirModalEquipa(-1,[]);
+}
+
+function editarEquipa(i){
+  const eq=getEquipas()[i];
+  if(!eq)return;
+  abrirModalEquipa(i,[...eq.sups]);
+}
+
+function removerEquipa(i){
+  if(!confirm('Remover esta equipa?'))return;
+  if(!APP.equipas)APP.equipas=[];
+  APP.equipas.splice(i,1);
+  gravar();renderEquipas();
+}
+
+/* Modal para criar/editar equipa */
+let _eqIdx=-1, _eqSups=[];
+
+function abrirModalEquipa(idx,sups){
+  _eqIdx=idx; _eqSups=[...sups];
+  let modal=document.getElementById('eq-modal');
+  if(!modal){
+    modal=document.createElement('div');
+    modal.id='eq-modal';
+    modal.style.cssText='position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);';
+    document.body.appendChild(modal);
+  }
+  const allSups=getSups();
+  modal.innerHTML=`<div style="background:#fff;border-radius:16px;padding:24px;width:min(480px,90vw);max-height:80vh;overflow-y:auto;">
+    <div style="font-size:16px;font-weight:700;margin-bottom:16px;">${idx===-1?'Nova Equipa':'Editar Equipa'}</div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Selecionar supervisores</div>
+    <div id="eq-sup-checks" style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px;">
+      ${allSups.map(s=>`<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);cursor:pointer;">
+        <input type="checkbox" value="${s}" ${_eqSups.includes(s)?'checked':''} onchange="window._eqToggle&&window._eqToggle(this)" style="width:16px;height:16px;cursor:pointer;">
+        <span style="font-size:13px;font-weight:500;">${toTitle(s)}</span>
+        <span style="font-size:11px;color:var(--muted);margin-left:auto;">${getLojasSup(s).length} lojas</span>
+      </label>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="document.getElementById('eq-modal').style.display='none'" style="padding:9px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:13px;cursor:pointer;">Cancelar</button>
+      <button onclick="window.guardarEquipa&&window.guardarEquipa()" style="padding:9px 16px;border-radius:8px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">Guardar</button>
+    </div>
+  </div>`;
+  modal.style.display='flex';
+}
+
+window._eqToggle=function(cb){
+  const s=cb.value;
+  if(cb.checked){ if(!_eqSups.includes(s))_eqSups.push(s); }
+  else { _eqSups=_eqSups.filter(x=>x!==s); }
+};
+
+function guardarEquipa(){
+  if(_eqSups.length<2){alert('Seleciona pelo menos 2 supervisores.');return;}
+  if(!APP.equipas)APP.equipas=[];
+  const eq={sups:_eqSups};
+  if(_eqIdx===-1) APP.equipas.push(eq);
+  else APP.equipas[_eqIdx]=eq;
+  gravar();
+  document.getElementById('eq-modal').style.display='none';
+  renderEquipas();
+}
+
+/* Descobrir a que equipa pertence um supervisor */
+function getEquipaDe(sup){
+  return (APP.equipas||[]).find(eq=>eq.sups.includes(sup))||null;
+}
+
 function gerarAgenda(){
   const m=document.getElementById('sel-m').value,a=document.getElementById('sel-a').value;
   const key=mk(m,a),sels=APP.sels[key]||{},folga=+APP.cfg.folga;
   const ents=[];
+  const dim=new Date(+a,+m+1,0).getDate(),wd=[];
+  for(let d=1;d<=dim;d++)if(new Date(+a,+m,d).getDay()!==folga)wd.push(d);
+
+  const processados=new Set();
+
   getSups().forEach(sup=>{
-    const s=sels[sup]||{};if(!s.op1||!s.op2)return;
-    const ljs=getLojasSup(sup);if(!ljs.length)return;
-    const dim=new Date(+a,+m+1,0).getDate(),wd=[];
-    for(let d=1;d<=dim;d++)if(new Date(+a,+m,d).getDay()!==folga)wd.push(d);
-    wd.forEach((dia,i)=>{const lj=ljs[i%ljs.length];ents.push({data:`${a}-${String(+m+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`,sup,op1:s.op1,op2:s.op2,lid:lj.id,lnome:lj.nome});});
+    if(processados.has(sup))return;
+    const s=sels[sup]||{};if(!s.op1)return;
+
+    const equipa=getEquipaDe(sup);
+
+    if(equipa){
+      // Todos os supervisores da equipa com pelo menos op1
+      const membros=equipa.sups.filter(ms=>{
+        const ms_s=sels[ms]||{};
+        return ms_s.op1 && getLojasSup(ms).length;
+      });
+      if(!membros.length)return;
+      membros.forEach(ms=>processados.add(ms));
+
+      // Construir lista de lojas intercaladas entre supervisores
+      // Ex: [A1, B1, A2, B2, A3...] onde A=lojas sup1, B=lojas sup2
+      const lojasGrupo=[];
+      const maxLojas=Math.max(...membros.map(ms=>getLojasSup(ms).length));
+      for(let i=0;i<maxLojas;i++){
+        membros.forEach(ms=>{
+          const ljs=getLojasSup(ms);
+          if(i<ljs.length) lojasGrupo.push({loja:ljs[i],sup:ms});
+        });
+      }
+
+      wd.forEach((dia,i)=>{
+        const item=lojasGrupo[i%lojasGrupo.length];
+        const ms_s=sels[item.sup]||{};
+        ents.push({
+          data:`${a}-${String(+m+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`,
+          sup:item.sup,
+          equipa:membros.map(ms=>toTitle(ms)).join(' + '),
+          op1:ms_s.op1||'',op2:ms_s.op2||'',
+          lid:item.loja.id,lnome:item.loja.nome
+        });
+      });
+
+    } else {
+      // Supervisor independente
+      processados.add(sup);
+      if(!s.op1)return;
+      const ljs=getLojasSup(sup);if(!ljs.length)return;
+      wd.forEach((dia,i)=>{
+        const lj=ljs[i%ljs.length];
+        ents.push({data:`${a}-${String(+m+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`,sup,op1:s.op1,op2:s.op2||'',lid:lj.id,lnome:lj.nome});
+      });
+    }
   });
+
   APP.agenda[key]=ents;gravar();
   const MN=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   alert(`Agenda gerada — ${ents.length} visitas em ${MN[m]} ${a}.`);
@@ -2064,6 +2226,11 @@ window.renderPinAdmin = renderPinAdmin;
 window.atualizarPares = atualizarPares;
 window.renderSel      = renderSel;
 window.gerarAgenda    = gerarAgenda;
+window.adicionarEquipa = adicionarEquipa;
+window.editarEquipa    = editarEquipa;
+window.removerEquipa   = removerEquipa;
+window.guardarEquipa   = guardarEquipa;
+window.renderEquipas   = renderEquipas;
 window.limparAgenda   = limparAgenda;
 window.sincronizarFiltros = sincronizarFiltros;
 window.fecharFiltros  = fecharFiltros;
