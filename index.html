@@ -1392,19 +1392,19 @@ function criarOpWidget(uid,label,valorInicial,cb){
   return `<div class="fg" style="margin:0;">
     <label class="fl">${label}</label>
     <div class="op-wrap" id="wrap-${uid}">
-      <div class="op-trigger${temVal?'':''}" id="trg-${uid}" onclick="abrirOp('${uid}')">
+      <div class="op-trigger${temVal?'':''}" id="trg-${uid}" data-abrir-op="${uid}">
         <i class="ti ti-user opi"></i>
         <div class="op-disp${temVal?'':' ph'}" id="disp-${uid}">${temVal?toTitle(op.nome):'— Selecionar operador —'}</div>
         ${temVal?`<span class="op-num" id="num-${uid}">${op.id}</span>`:`<span class="op-num" id="num-${uid}" style="display:none"></span>`}
-        <button class="op-clr${temVal?' vis':''}" id="clr-${uid}" onclick="event.stopPropagation();limparOp('${uid}')"><i class="ti ti-x"></i></button>
+        <button class="op-clr${temVal?' vis':''}" id="clr-${uid}" data-limpar-op="${uid}"><i class="ti ti-x"></i></button>
         <i class="ti ti-chevron-down op-chv" id="chv-${uid}"></i>
       </div>
       <div class="op-drop" id="drop-${uid}">
         <div class="op-drop-search">
           <i class="ti ti-search"></i>
           <input id="srch-${uid}" type="text" placeholder="Nome ou nº colaborador…"
-            oninput="filtrarOp('${uid}')"
-            onkeydown="navOp(event,'${uid}')"
+            
+            
             autocomplete="off">
         </div>
         <div class="op-list" id="list-${uid}"></div>
@@ -1460,7 +1460,7 @@ function preencherOp(uid,q){
   const ops=t?DB.operadores.filter(o=>o.nome.toLowerCase().includes(t)||o.id.includes(t)):DB.operadores;
   if(!ops.length){lista.innerHTML=`<div class="op-empty">Nenhum resultado para "${q}"</div>`;return;}
   lista.innerHTML=ops.slice(0,100).map(o=>`
-    <div class="op-item${o.id===valAtual?' sel':''}" onclick="selecionarOp('${uid}','${o.id}')">
+    <div class="op-item${o.id===valAtual?' sel':''}" data-selecionar-op="${uid}" data-op-id="${o.id}">
       <span class="op-item-name">${dest(toTitle(o.nome),t)}</span>
       <span class="op-item-id">${dest(o.id,t)}</span>
     </div>`).join('')+(ops.length>100?`<div class="op-empty">+${ops.length-100} — refine a pesquisa</div>`:'');
@@ -1498,7 +1498,23 @@ function limparOp(uid){
 }
 
 document.addEventListener('click',e=>{
+  const clrBtn=e.target.closest('[data-limpar-op]');
+  if(clrBtn){e.stopPropagation();limparOp(clrBtn.dataset.limparOp);return;}
+  const trg=e.target.closest('[data-abrir-op]');
+  if(trg){abrirOp(trg.dataset.abrirOp);return;}
+  const item=e.target.closest('[data-selecionar-op]');
+  if(item){selecionarOp(item.dataset.selecionarOp,item.dataset.opId);return;}
   if(!e.target.closest('.op-wrap')&&window.innerWidth>700) fecharTodosOp();
+});
+
+document.addEventListener('input',e=>{
+  const inp=e.target.closest('[data-srch-op]');
+  if(inp) filtrarOp(inp.dataset.srchOp);
+});
+
+document.addEventListener('keydown',e=>{
+  const inp=e.target.closest('[data-srch-op]');
+  if(inp) navOp(e,inp.dataset.srchOp);
 });
 
 /* ════════════════════════════════════════
