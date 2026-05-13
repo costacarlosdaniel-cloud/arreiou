@@ -835,21 +835,21 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   <div class="filter-sheet-title">Filtros da Agenda</div>
   <div class="fg">
     <label class="fl">Mês</label>
-    <select id="ag-m-mob" onchange="sincronizarFiltros('mes')">
+    <select id="ag-m-mob" onchange="window.sincronizarFiltros&&window.sincronizarFiltros('mes')">
       <option value="0">Janeiro</option><option value="1">Fevereiro</option><option value="2">Março</option><option value="3">Abril</option><option value="4">Maio</option><option value="5">Junho</option><option value="6">Julho</option><option value="7">Agosto</option><option value="8">Setembro</option><option value="9">Outubro</option><option value="10">Novembro</option><option value="11">Dezembro</option>
     </select>
   </div>
   <div class="fg">
     <label class="fl">Ano</label>
-    <select id="ag-a-mob" onchange="sincronizarFiltros('ano')">
+    <select id="ag-a-mob" onchange="window.sincronizarFiltros&&window.sincronizarFiltros('ano')">
       <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
     </select>
   </div>
   <div class="fg">
     <label class="fl">Pesquisar</label>
-    <input type="text" id="ag-q-mob" placeholder="Loja ou operador…" oninput="sincronizarFiltros('q')">
+    <input type="text" id="ag-q-mob" placeholder="Loja ou operador…" oninput="window.sincronizarFiltros&&window.sincronizarFiltros('q')">
   </div>
-  <button class="btn btn-gold btn-full" onclick="fecharFiltros();renderAgenda()">Aplicar</button>
+  <button class="btn btn-gold btn-full" onclick="window.fecharFiltros&&window.fecharFiltros();window.renderAgenda&&window.renderAgenda()">Aplicar</button>
 </div>
 
 <div class="app">
@@ -862,15 +862,15 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     </div>
     <nav class="sb-nav">
       <div class="sb-sec">Programa</div>
-      <button class="nb on" onclick="go('selecao',this)"><i class="ti ti-users-group"></i> Seleção Mensal</button>
-      <button class="nb" onclick="go('agenda',this)"><i class="ti ti-list-details"></i> Agenda</button>
-      <button class="nb" onclick="go('calendario',this)"><i class="ti ti-calendar-month"></i> Calendário</button>
+      <button class="nb on" onclick="window.go&&window.go('selecao',this)"><i class="ti ti-users-group"></i> Seleção Mensal</button>
+      <button class="nb" onclick="window.go&&window.go('agenda',this)"><i class="ti ti-list-details"></i> Agenda</button>
+      <button class="nb" onclick="window.go&&window.go('calendario',this)"><i class="ti ti-calendar-month"></i> Calendário</button>
       <div class="sb-sec">Sistema</div>
-      <button class="nb" onclick="go('administracao',this)"><i class="ti ti-settings-2"></i> Administração</button>
+      <button class="nb" onclick="window.go&&window.go('administracao',this)"><i class="ti ti-settings-2"></i> Administração</button>
     </nav>
     <div class="sb-foot">
       <div class="sync-pill"><span class="sdot" id="sdot"></span><span id="stxt">Sincronizado</span></div>
-      <button class="sb-refresh-btn" onclick="window._recarregarForcar()"><i class="ti ti-refresh"></i> Atualizar dados</button>
+      <button class="sb-refresh-btn" onclick="window._recarregarForcar&&window._recarregarForcar()"><i class="ti ti-refresh"></i> Atualizar dados</button>
     </div>
   </aside>
 
@@ -891,7 +891,7 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <div class="mob-logo">Limp<em>us</em></div>
       <div class="mob-topbar-right">
         <div class="mob-sync"><span class="sdot" id="sdot-m"></span><span id="stxt-m">Live</span></div>
-        <button class="mob-refresh" onclick="window._recarregarForcar()"><i class="ti ti-refresh"></i></button>
+        <button class="mob-refresh" onclick="window._recarregarForcar&&window._recarregarForcar()"><i class="ti ti-refresh"></i></button>
       </div>
     </header>
 
@@ -909,17 +909,17 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
           <div class="ph-r">
             <div class="fg" style="margin:0;">
               <label class="fl">Mês</label>
-              <select id="sel-m" onchange="renderSel()" style="width:120px;">
+              <select id="sel-m" onchange="window.renderSel&&window.renderSel()" style="width:120px;">
                 <option value="0">Janeiro</option><option value="1">Fevereiro</option><option value="2">Março</option><option value="3">Abril</option><option value="4">Maio</option><option value="5">Junho</option><option value="6">Julho</option><option value="7">Agosto</option><option value="8">Setembro</option><option value="9">Outubro</option><option value="10">Novembro</option><option value="11">Dezembro</option>
               </select>
             </div>
             <div class="fg" style="margin:0;">
               <label class="fl">Ano</label>
-              <select id="sel-a" onchange="renderSel()" style="width:84px;">
+              <select id="sel-a" onchange="window.renderSel&&window.renderSel()" style="width:84px;">
                 <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
               </select>
             </div>
-            <button class="btn btn-gold" onclick="gerarAgenda()"><i class="ti ti-bolt"></i> Gerar Agenda</button>
+            <button class="btn btn-gold" onclick="window.gerarAgenda&&window.gerarAgenda()"><i class="ti ti-bolt"></i> Gerar Agenda</button>
           </div>
         </div>
 
@@ -962,20 +962,20 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
             <!-- Desktop filters inline -->
             <div class="fg" style="margin:0;" id="ag-fil-desk">
               <label class="fl">Mês</label>
-              <select id="ag-m" onchange="renderAgenda()" style="width:120px;">
+              <select id="ag-m" onchange="window.renderAgenda&&window.renderAgenda()" style="width:120px;">
                 <option value="0">Janeiro</option><option value="1">Fevereiro</option><option value="2">Março</option><option value="3">Abril</option><option value="4">Maio</option><option value="5">Junho</option><option value="6">Julho</option><option value="7">Agosto</option><option value="8">Setembro</option><option value="9">Outubro</option><option value="10">Novembro</option><option value="11">Dezembro</option>
               </select>
             </div>
             <div class="fg" style="margin:0;" id="ag-fil-desk-a">
               <label class="fl">Ano</label>
-              <select id="ag-a" onchange="renderAgenda()" style="width:84px;"><option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option></select>
+              <select id="ag-a" onchange="window.renderAgenda&&window.renderAgenda()" style="width:84px;"><option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option></select>
             </div>
             <div class="fg" style="margin:0;" id="ag-fil-desk-q">
               <label class="fl">Pesquisar</label>
-              <input type="text" id="ag-q" placeholder="Loja ou operador…" oninput="renderAgenda()" style="width:180px;">
+              <input type="text" id="ag-q" placeholder="Loja ou operador…" oninput="window.renderAgenda&&window.renderAgenda()" style="width:180px;">
             </div>
             <!-- Mobile filter button -->
-            <button class="btn btn-outline btn-icon" id="ag-fil-mob-btn" onclick="abrirFiltros()" style="display:none;"><i class="ti ti-adjustments-horizontal"></i></button>
+            <button class="btn btn-outline btn-icon" id="ag-fil-mob-btn" onclick="window.abrirFiltros&&window.abrirFiltros()" style="display:none;"><i class="ti ti-adjustments-horizontal"></i></button>
           </div>
         </div>
         <div id="agenda-out"></div>
@@ -995,9 +995,9 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
           <div class="card-bd" style="padding:14px;">
             <div class="cal-hdr">
               <div class="cal-btns">
-                <button class="btn btn-outline btn-sm" onclick="calMover(-1)"><i class="ti ti-chevron-left"></i></button>
+                <button class="btn btn-outline btn-sm" onclick="window.calMover&&window.calMover(-1)"><i class="ti ti-chevron-left"></i></button>
                 <span class="cal-month" id="cal-mes"></span>
-                <button class="btn btn-outline btn-sm" onclick="calMover(1)"><i class="ti ti-chevron-right"></i></button>
+                <button class="btn btn-outline btn-sm" onclick="window.calMover&&window.calMover(1)"><i class="ti ti-chevron-right"></i></button>
               </div>
               <div style="display:flex;gap:12px;align-items:center;font-size:11px;color:var(--muted);">
                 <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--blue);display:inline-block;"></span>Visita</span>
@@ -1011,7 +1011,7 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
         <div class="cal-dtl" id="cal-dtl">
           <div class="cd-hd">
             <div class="cd-ttl" id="cd-ttl"></div>
-            <button class="btn btn-ghost btn-sm" onclick="fecharCalDtl()"><i class="ti ti-x"></i></button>
+            <button class="btn btn-ghost btn-sm" onclick="window.fecharCalDtl&&window.fecharCalDtl()"><i class="ti ti-x"></i></button>
           </div>
           <div class="cd-bd" id="cd-bd"></div>
         </div>
@@ -1043,7 +1043,7 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
                 <div class="pin-page-status" id="login-pin-status">Desativado — acesso livre</div>
               </div>
               <div class="pin-page-actions">
-                <button class="pin-toggle" id="toggle-login" onclick="toggleLoginPin()"></button>
+                <button class="pin-toggle" id="toggle-login" onclick="window.toggleLoginPin&&window.toggleLoginPin()"></button>
               </div>
             </div>
             <div id="login-pin-setup" style="display:none;padding:12px 0 4px;">
@@ -1052,7 +1052,7 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
                 <input type="password" inputmode="numeric" maxlength="4" id="input-login-pin"
                   class="pin-input-mini" placeholder="••••" oninput="this.value=this.value.replace(/\D/g,'')">
                 <button class="pin-reveal-btn" onclick="toggleReveal('input-login-pin',this)"><i class="ti ti-eye"></i></button>
-                <button class="btn btn-gold pin-set-btn" onclick="guardarPinLogin()"><i class="ti ti-check"></i> Guardar</button>
+                <button class="btn btn-gold pin-set-btn" onclick="window.guardarPinLogin&&window.guardarPinLogin()"><i class="ti ti-check"></i> Guardar</button>
               </div>
             </div>
             <hr class="sep">
@@ -1080,7 +1080,7 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
                   <select id="nt-f"><option>Por visita</option><option>Diária</option><option>Semanal</option></select>
                 </div>
               </div>
-              <button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="adicionarTarefa()"><i class="ti ti-plus"></i> Adicionar</button>
+              <button class="btn btn-primary btn-full" style="margin-top:12px;" onclick="window.adicionarTarefa&&window.adicionarTarefa()"><i class="ti ti-plus"></i> Adicionar</button>
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:14px;">
@@ -1088,7 +1088,7 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
               <div class="card-hd"><span class="card-ttl">Configuração</span></div>
               <div class="card-bd" style="padding:4px 18px 14px;">
                 <div class="cfg-r"><div><div class="cfg-l">Equipa</div><div class="cfg-d">2 operadores por visita</div></div><div class="cfg-c"><span class="bdg bdg-gold">2 Fixo</span></div></div>
-                <div class="cfg-r"><div><div class="cfg-l">Dia de folga</div><div class="cfg-d">Descanso semanal</div></div><div class="cfg-c"><select id="cfg-rest" onchange="guardarCfg()"><option value="0">Domingo</option><option value="6" selected>Sábado</option><option value="5">Sexta</option></select></div></div>
+                <div class="cfg-r"><div><div class="cfg-l">Dia de folga</div><div class="cfg-d">Descanso semanal</div></div><div class="cfg-c"><select id="cfg-rest" onchange="window.guardarCfg&&window.guardarCfg()"><option value="0">Domingo</option><option value="1">Segunda</option><option value="2">Terça</option><option value="3">Quarta</option><option value="4">Quinta</option><option value="5">Sexta</option><option value="6" selected>Sábado</option></select></div></div>
                 <div class="cfg-r"><div><div class="cfg-l">GV activo</div><div class="cfg-d">Filtro da fonte de dados</div></div><div class="cfg-c"><span class="bdg bdg-gold">Carlos Daniel</span></div></div>
               </div>
             </div>
@@ -1100,14 +1100,14 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
                   <span class="bdg bdg-green" id="dir-badge-ativas" style="display:none;"></span>
                 </div>
                 <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
-                  <button class="btn btn-ghost btn-sm" id="dir-filtro-btn" onclick="toggleFiltroLojas()" style="font-size:11px;padding:5px 10px;">
+                  <button class="btn btn-ghost btn-sm" id="dir-filtro-btn" onclick="window.toggleFiltroLojas&&window.toggleFiltroLojas()" style="font-size:11px;padding:5px 10px;">
                     <i class="ti ti-filter"></i> <span id="dir-filtro-txt">Todas</span>
                   </button>
                 </div>
               </div>
               <div class="card-bd" style="padding:0;">
                 <div style="padding:10px 14px;border-bottom:1px solid var(--border2);">
-                  <input type="text" id="dir-q" placeholder="Filtrar lojas…" oninput="renderDir()">
+                  <input type="text" id="dir-q" placeholder="Filtrar lojas…" oninput="window.renderDir&&window.renderDir()">
                 </div>
                 <div style="max-height:380px;overflow-y:auto;-webkit-overflow-scrolling:touch;" id="dir-lista"></div>
               </div>
@@ -1119,19 +1119,19 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 <!-- ────────── BOTTOM NAV (mobile) ────────── -->
 <nav class="mob-nav">
   <div class="mob-nav-inner">
-    <button class="mob-nb on" id="mob-nb-selecao" onclick="go('selecao',this);mobNav(this)">
+    <button class="mob-nb on" id="mob-nb-selecao" onclick="window.go&&window.go('selecao',this);window.mobNav&&window.mobNav(this)">
       <i class="ti ti-users-group"></i>
       <span>Seleção</span>
     </button>
-    <button class="mob-nb" id="mob-nb-agenda" onclick="go('agenda',this);mobNav(this)">
+    <button class="mob-nb" id="mob-nb-agenda" onclick="window.go&&window.go('agenda',this);window.mobNav&&window.mobNav(this)">
       <i class="ti ti-list-details"></i>
       <span>Agenda</span>
     </button>
-    <button class="mob-nb" id="mob-nb-calendario" onclick="go('calendario',this);mobNav(this)">
+    <button class="mob-nb" id="mob-nb-calendario" onclick="window.go&&window.go('calendario',this);window.mobNav&&window.mobNav(this)">
       <i class="ti ti-calendar-month"></i>
       <span>Calendário</span>
     </button>
-    <button class="mob-nb" id="mob-nb-administracao" onclick="go('administracao',this);mobNav(this)">
+    <button class="mob-nb" id="mob-nb-administracao" onclick="window.go&&window.go('administracao',this);window.mobNav&&window.mobNav(this)">
       <i class="ti ti-settings-2"></i>
       <span>Admin</span>
     </button>
@@ -1510,13 +1510,62 @@ function limparOp(uid){
 }
 
 document.addEventListener('click',e=>{
+  // Op widget
   const clrBtn=e.target.closest('[data-limpar-op]');
   if(clrBtn){e.stopPropagation();limparOp(clrBtn.dataset.limparOp);return;}
   const trg=e.target.closest('[data-abrir-op]');
   if(trg){abrirOp(trg.dataset.abrirOp);return;}
   const item=e.target.closest('[data-selecionar-op]');
   if(item){selecionarOp(item.dataset.selecionarOp,item.dataset.opId);return;}
+  // Tarefas
+  const elimBtn=e.target.closest('[data-elim-tarefa]');
+  if(elimBtn){eliminarTarefa(+elimBtn.dataset.elimTarefa);return;}
+  // Agenda editar/guardar
+  const evBtn=e.target.closest('[data-edit-visita]');
+  if(evBtn){const[key,idx]=evBtn.dataset.editVisita.split('|');editarVisita(key,+idx);return;}
+  const gvBtn=e.target.closest('[data-guardar-visita]');
+  if(gvBtn){
+    const[key,idx]=gvBtn.dataset.guardarVisita.split('|');
+    const radio=document.querySelector('#edit-visita-modal input[name="ev-loja"]:checked');
+    if(!radio)return;
+    const[lid,lnome,sup]=radio.value.split('|');
+    const ents=APP.agenda[key]||[];
+    if(!ents[+idx])return;
+    ents[+idx]={...ents[+idx],lid,lnome,sup};
+    APP.agenda[key]=ents;
+    gravar();
+    document.getElementById('edit-visita-modal').style.display='none';
+    renderAgenda();renderCal();
+    return;
+  }
+  // Equipas
+  const eqEdit=e.target.closest('[data-editar-equipa]');
+  if(eqEdit){editarEquipa(+eqEdit.dataset.editarEquipa);return;}
+  const eqRem=e.target.closest('[data-remover-equipa]');
+  if(eqRem){removerEquipa(+eqRem.dataset.removerEquipa);return;}
+  // Calendário
+  const calBtn=e.target.closest('[data-cal-dia]');
+  if(calBtn){calDetalhe(+calBtn.dataset.calDia);return;}
+  // Lojas ativar/inativar
+  const ljBtn=e.target.closest('[data-toggle-loja]');
+  if(ljBtn){toggleLojaAtiva(ljBtn.dataset.toggleLoja);return;}
+  // PIN admin
+  const pinEdit=e.target.closest('[data-editar-pin]');
+  if(pinEdit){editarPinAba(pinEdit.dataset.editarPin);return;}
+  const pinRem=e.target.closest('[data-remover-pin]');
+  if(pinRem){removerPinAba(pinRem.dataset.removerPin);return;}
+  const pinGuard=e.target.closest('[data-guardar-pin]');
+  if(pinGuard){guardarPinAba(pinGuard.dataset.guardarPin);return;}
+  const pinFech=e.target.closest('[data-fechar-pin]');
+  if(pinFech){document.getElementById('pin-setup-'+pinFech.dataset.fecharPin).style.display='none';return;}
+  const pinRev=e.target.closest('[data-reveal-pin]');
+  if(pinRev){toggleReveal('pinip-'+pinRev.dataset.revealPin,pinRev);return;}
   if(!e.target.closest('.op-wrap')&&window.innerWidth>700) fecharTodosOp();
+});
+
+document.addEventListener('change',e=>{
+  const cb=e.target.closest('[data-eq-toggle]');
+  if(cb&&cb.type==='checkbox') window._eqToggle&&window._eqToggle(cb);
 });
 
 document.addEventListener('input',e=>{
@@ -1591,8 +1640,8 @@ function renderEquipas(){
         <div style="font-size:13px;font-weight:600;color:var(--ink);">${nomes}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px;">${eq.sups.length} supervisores · ${eq.sups.reduce((t,s)=>t+getLojasSup(s).length,0)} lojas combinadas</div>
       </div>
-      <button onclick="window.editarEquipa&&window.editarEquipa(${i})" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;"><i class="ti ti-edit"></i></button>
-      <button onclick="window.removerEquipa&&window.removerEquipa(${i})" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--red);cursor:pointer;"><i class="ti ti-trash"></i></button>
+      <button data-editar-equipa="${i}" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;"><i class="ti ti-edit"></i></button>
+      <button data-remover-equipa="${i}" style="font-size:11px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--red);cursor:pointer;"><i class="ti ti-trash"></i></button>
     </div>`;
   }).join('');
 }
@@ -1632,7 +1681,7 @@ function abrirModalEquipa(idx,sups){
     <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Selecionar supervisores</div>
     <div id="eq-sup-checks" style="display:flex;flex-direction:column;gap:6px;margin-bottom:20px;">
       ${allSups.map(s=>`<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);cursor:pointer;">
-        <input type="checkbox" value="${s}" ${_eqSups.includes(s)?'checked':''} onchange="window._eqToggle&&window._eqToggle(this)" style="width:16px;height:16px;cursor:pointer;">
+        <input type="checkbox" value="${s}" ${_eqSups.includes(s)?'checked':''} data-eq-toggle="1" style="width:16px;height:16px;cursor:pointer;">
         <span style="font-size:13px;font-weight:500;">${toTitle(s)}</span>
         <span style="font-size:11px;color:var(--muted);margin-left:auto;">${getLojasSup(s).length} lojas</span>
       </label>`).join('')}
@@ -1683,7 +1732,7 @@ function gerarAgenda(){
     const equipa=getEquipaDe(sup);
 
     if(equipa){
-      // Todos os supervisores da equipa com pelo menos op1
+      // Membros com pelo menos op1 e lojas
       const membros=equipa.sups.filter(ms=>{
         const ms_s=sels[ms]||{};
         return ms_s.op1 && getLojasSup(ms).length;
@@ -1691,8 +1740,15 @@ function gerarAgenda(){
       if(!membros.length)return;
       membros.forEach(ms=>processados.add(ms));
 
-      // Construir lista de lojas intercaladas entre supervisores
-      // Ex: [A1, B1, A2, B2, A3...] onde A=lojas sup1, B=lojas sup2
+      // Operadores combinados de TODOS os supervisores da equipa
+      const ops=[];
+      membros.forEach(ms=>{
+        const ms_s=sels[ms]||{};
+        if(ms_s.op1) ops.push(ms_s.op1);
+        if(ms_s.op2) ops.push(ms_s.op2);
+      });
+
+      // Lojas intercaladas entre supervisores: A1,B1,A2,B2,...
       const lojasGrupo=[];
       const maxLojas=Math.max(...membros.map(ms=>getLojasSup(ms).length));
       for(let i=0;i<maxLojas;i++){
@@ -1702,15 +1758,17 @@ function gerarAgenda(){
         });
       }
 
+      const nomeEquipa=membros.map(ms=>toTitle(ms)).join(' + ');
       wd.forEach((dia,i)=>{
         const item=lojasGrupo[i%lojasGrupo.length];
-        const ms_s=sels[item.sup]||{};
         ents.push({
           data:`${a}-${String(+m+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`,
           sup:item.sup,
-          equipa:membros.map(ms=>toTitle(ms)).join(' + '),
-          op1:ms_s.op1||'',op2:ms_s.op2||'',
-          lid:item.loja.id,lnome:item.loja.nome
+          equipa:nomeEquipa,
+          ops, // array com todos os operadores da equipa
+          op1:ops[0]||'',op2:ops[1]||'', // compat
+          lid:item.loja.id,lnome:item.loja.nome,
+          _eqKey:membros.join('|')
         });
       });
 
@@ -1761,6 +1819,12 @@ function fecharFiltros(){
 function opNome(id){const o=DB.operadores.find(x=>x.id===id);return o?o.nome:id;}
 function opCurto(id){const n=opNome(id).split(' ');return n[0]+' '+n[n.length-1];}
 
+function _renderOps(e){
+  const ops=e.ops&&e.ops.length?e.ops:[e.op1,e.op2].filter(Boolean);
+  const cores=['bdg-blue','bdg-teal','bdg-green','bdg-gold'];
+  return ops.map((id,i)=>`<span class="bdg ${cores[i%cores.length]}">${opCurto(id)}</span>`).join(' ');
+}
+
 function renderAgenda(){
   const m=document.getElementById('ag-m')?.value??new Date().getMonth();
   const a=document.getElementById('ag-a')?.value??new Date().getFullYear();
@@ -1770,38 +1834,85 @@ function renderAgenda(){
     el.innerHTML=`<div class="card"><div class="card-bd"><div class="empty"><i class="ti ti-calendar-x"></i><p>Sem agenda para este mês.<br>Vá a <strong>Seleção Mensal</strong> e clique em <strong>Gerar Agenda</strong>.</p></div></div></div>`;
     return;
   }
-  let lista=q?ents.filter(e=>e.lnome.toLowerCase().includes(q)||opNome(e.op1).toLowerCase().includes(q)||opNome(e.op2).toLowerCase().includes(q)||e.sup.toLowerCase().includes(q)):ents;
+  let lista=q?ents.filter(e=>{
+    const ops=e.ops||[e.op1,e.op2].filter(Boolean);
+    return e.lnome.toLowerCase().includes(q)||ops.some(id=>opNome(id).toLowerCase().includes(q))||e.sup.toLowerCase().includes(q);
+  }):ents;
+  const idxMap=lista.map(e=>ents.indexOf(e));
   const semanas={};
-  lista.forEach(e=>{const d=new Date(e.data+'T12:00:00'),s=isoSem(d);(semanas[s]=semanas[s]||[]).push(e);});
+  lista.forEach((e,li)=>{const d=new Date(e.data+'T12:00:00'),s=isoSem(d);(semanas[s]=semanas[s]||[]).push({e,gi:idxMap[li]});});
   const DA=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'],MS=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const isMob=window.innerWidth<=700;
   let html=`<div style="font-size:12px;color:var(--muted);margin-bottom:18px;">${lista.length} visita${lista.length!==1?'s':''} programada${lista.length!==1?'s':''}${q?' (filtrado)':''}</div>`;
   Object.keys(semanas).sort((a,b)=>+a-+b).forEach(s=>{
-    const we=semanas[s],f=new Date(we[0].data+'T12:00:00'),l=new Date(we[we.length-1].data+'T12:00:00');
+    const we=semanas[s],f=new Date(we[0].e.data+'T12:00:00'),l=new Date(we[we.length-1].e.data+'T12:00:00');
     html+=`<div class="wk-sep">Semana ${s} · ${f.getDate()} ${MS[f.getMonth()]} — ${l.getDate()} ${MS[l.getMonth()]}</div>`;
     if(isMob){
-      html+=we.map(e=>{const d=new Date(e.data+'T12:00:00');return`<div class="sched-card">
-        <div class="sched-card-date">${DA[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}</div>
-        <div class="sched-card-store"><span class="chip">${e.lid}</span> ${e.lnome}</div>
-        <div class="sched-card-ops">
-          <span class="bdg bdg-blue">${opCurto(e.op1)}</span>
-          <span class="bdg bdg-teal">${opCurto(e.op2)}</span>
-        </div>
-      </div>`;}).join('');
+      html+=we.map(({e,gi})=>{
+        const d=new Date(e.data+'T12:00:00');
+        const agKey=mk(document.getElementById('ag-m').value,document.getElementById('ag-a').value);
+        return `<div class="sched-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div class="sched-card-date">${DA[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}</div>
+            <button data-edit-visita="${agKey}|${gi}" style="font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;"><i class="ti ti-edit"></i></button>
+          </div>
+          <div class="sched-card-store"><span class="chip">${e.lid}</span> ${e.lnome}</div>
+          ${e.equipa?`<div style="font-size:10px;color:var(--muted);margin:4px 0;">${e.equipa}</div>`:''}
+          <div class="sched-card-ops">${_renderOps(e)}</div>
+        </div>`;
+      }).join('');
     } else {
+      const hasEquipa=we.some(({e})=>e.equipa);
+      const agKey=mk(document.getElementById('ag-m').value,document.getElementById('ag-a').value);
       html+=`<div class="card" style="margin-bottom:0;"><div class="tw"><table>
-        <thead><tr><th>Data</th><th>Loja</th><th>Supervisor</th><th>Op. 1</th><th>Op. 2</th></tr></thead>
-        <tbody>${we.map(e=>{const d=new Date(e.data+'T12:00:00');return`<tr>
+        <thead><tr><th>Data</th><th>Loja</th><th>${hasEquipa?'Equipa':'Supervisor'}</th><th>Operadores</th><th></th></tr></thead>
+        <tbody>${we.map(({e,gi})=>{const d=new Date(e.data+'T12:00:00');return`<tr>
           <td><strong>${DA[d.getDay()]}</strong> <span style="color:var(--muted);">${d.getDate()}/${d.getMonth()+1}</span></td>
           <td><span class="chip">${e.lid}</span> <span style="color:var(--muted);font-size:12px;margin-left:6px;">${e.lnome}</span></td>
-          <td style="font-size:12px;color:var(--muted);">${toTitle(e.sup)}</td>
-          <td><span class="bdg bdg-blue">${opCurto(e.op1)}</span></td>
-          <td><span class="bdg bdg-teal">${opCurto(e.op2)}</span></td>
+          <td style="font-size:12px;color:var(--muted);">${e.equipa?e.equipa:toTitle(e.sup)}</td>
+          <td style="white-space:normal;">${_renderOps(e)}</td>
+          <td><button data-edit-visita="${agKey}|${gi}" style="font-size:11px;padding:5px 9px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;"><i class="ti ti-edit"></i></button></td>
         </tr>`;}).join('')}</tbody></table></div></div>`;
     }
   });
   el.innerHTML=html;
 }
+
+/* Edição manual de visita */
+function editarVisita(key,idx){
+  const ents=APP.agenda[key]||[];
+  const e=ents[idx];if(!e)return;
+  const eqKey=e._eqKey;
+  let lojasDisp;
+  if(eqKey){
+    lojasDisp=eqKey.split('|').flatMap(s=>getLojasSup(s));
+  } else {
+    lojasDisp=getLojasSup(e.sup);
+  }
+  let modal=document.getElementById('edit-visita-modal');
+  if(!modal){modal=document.createElement('div');modal.id='edit-visita-modal';modal.style.cssText='position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);';document.body.appendChild(modal);}
+  const DA=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const d=new Date(e.data+'T12:00:00');
+  modal.innerHTML=`<div style="background:#fff;border-radius:16px;padding:24px;width:min(440px,90vw);max-height:80vh;overflow-y:auto;">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px;">Editar Visita</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px;">${DA[d.getDay()]}, ${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}</div>
+    <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Escolher loja</div>
+    <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:20px;">
+      ${lojasDisp.map(l=>`<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;border:1px solid ${l.id===e.lid?'var(--blue)':'var(--border)'};background:${l.id===e.lid?'var(--blue-l)':'transparent'};cursor:pointer;">
+        <input type="radio" name="ev-loja" value="${l.id}|${l.nome}|${l.sup}" ${l.id===e.lid?'checked':''} style="accent-color:var(--blue);">
+        <span class="chip">${l.id}</span>
+        <span style="font-size:13px;font-weight:500;">${l.nome}</span>
+        <span style="font-size:11px;color:var(--muted);margin-left:auto;">${toTitle(l.sup)}</span>
+      </label>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="document.getElementById('edit-visita-modal').style.display='none'" style="padding:9px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:13px;cursor:pointer;">Cancelar</button>
+      <button data-guardar-visita="${key}|${idx}" style="padding:9px 16px;border-radius:8px;border:none;background:var(--blue);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">Guardar</button>
+    </div>
+  </div>`;
+  modal.style.display='flex';
+}
+
 
 function isoSem(d){const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),day=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-day);const a1=new Date(Date.UTC(dt.getUTCFullYear(),0,1));return Math.ceil((((dt-a1)/86400000)+1)/7);}
 
@@ -1826,7 +1937,7 @@ function renderCal(){
     const dow=new Date(calA,calM2,d).getDay(),isF=dow===folga,isH=hj.getFullYear()===calA&&hj.getMonth()===calM2&&hj.getDate()===d,de=dm[d]||[];
     let pips=isF?`<span class="cpip cpip-r">Folga</span>`:'';
     if(!isF){de.slice(0,2).forEach(e=>pips+=`<span class="cpip cpip-v">${e.lid}</span>`);if(de.length>2)pips+=`<span style="font-size:9px;color:var(--muted)">+${de.length-2}</span>`;}
-    cells+=`<div class="cc${isF?' rest':''}${isH?' tdy':''}" onclick="calDetalhe(${d})">
+    cells+=`<div class="cc${isF?' rest':''}${isH?' tdy':''}" data-cal-dia="${d}">
       <div class="cc-num">${isH?`<div style="background:var(--blue);color:#fff;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;">${d}</div>`:d}</div>
       ${pips}
     </div>`;
@@ -1881,7 +1992,7 @@ function renderTarefas(){
   const el=document.getElementById('t-lista');
   document.getElementById('t-badge').textContent=APP.tarefas.length;
   if(!APP.tarefas.length){el.innerHTML=`<div class="empty" style="padding:24px 0;"><i class="ti ti-clipboard-list" style="font-size:28px;color:var(--border);display:block;margin-bottom:10px;"></i><p>Sem tarefas.</p></div>`;return;}
-  el.innerHTML=APP.tarefas.map(t=>`<div class="task-item"><div class="ti-ico">${ico(t.cat)}</div><div class="ti-info"><div class="ti-name">${t.nome}</div><div class="ti-meta">${t.cat} · ${t.freq}</div></div><button class="btn btn-danger btn-sm" onclick="eliminarTarefa(${t.id})" style="flex-shrink:0;"><i class="ti ti-trash"></i></button></div>`).join('');
+  el.innerHTML=APP.tarefas.map(t=>`<div class="task-item"><div class="ti-ico">${ico(t.cat)}</div><div class="ti-info"><div class="ti-name">${t.nome}</div><div class="ti-meta">${t.cat} · ${t.freq}</div></div><button class="btn btn-danger btn-sm" data-elim-tarefa="${t.id}" style="flex-shrink:0;"><i class="ti ti-trash"></i></button></div>`).join('');
 }
 function guardarCfg(){APP.cfg.folga=+document.getElementById('cfg-rest').value;gravar();}
 let _dirFiltro = 'todas'; // 'todas' | 'ativas' | 'inativas'
@@ -1934,7 +2045,7 @@ function renderDir(){
         <div style="font-size:13px;font-weight:500;${ativa?'':'color:var(--muted);'}">${l.nome}</div>
         ${l.sup?`<div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${toTitle(l.sup)}</div>`:''}
       </div>
-      <button onclick="toggleLojaAtiva('${l.id}')" title="${ativa?'Inativar loja':'Ativar loja'}"
+      <button data-toggle-loja="${l.id}" title="${ativa?'Inativar loja':'Ativar loja'}"
         style="flex-shrink:0;padding:5px 10px;font-size:11px;font-weight:600;border-radius:6px;border:1px solid ${ativa?'var(--border)':'var(--blue)'};background:${ativa?'transparent':'var(--blue-l)'};color:${ativa?'var(--muted)':'var(--blue)'};cursor:pointer;">
         ${ativa?'<i class="ti ti-eye-off" style="font-size:13px;"></i>':'<i class="ti ti-eye" style="font-size:13px;"></i>'}
       </button>
@@ -2115,19 +2226,19 @@ function renderPinAdmin(){
         <div class="pin-page-status" id="pin-st-${tab.id}">${on?'PIN ativo':'Acesso livre'}</div>
       </div>
       <div class="pin-page-actions">
-        <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:6px 10px;" onclick="editarPinAba('${tab.id}')">
+        <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:6px 10px;" data-editar-pin="${tab.id}">
           <i class="ti ${on?'ti-edit':'ti-lock-plus'}"></i> ${on?'Alterar':'Definir PIN'}
         </button>
-        ${on?`<button class="pin-toggle on" onclick="removerPinAba('${tab.id}')"></button>`:''}
+        ${on?`<button class="pin-toggle on" data-remover-pin="${tab.id}"></button>`:''}
       </div>
     </div>
     <div id="pin-setup-${tab.id}" style="display:none;padding:10px 0 4px;">
       <div class="pin-set-row">
         <input type="password" inputmode="numeric" maxlength="4" id="pinip-${tab.id}"
           class="pin-input-mini" placeholder="••••" oninput="this.value=this.value.replace(/\\D/g,'')">
-        <button class="pin-reveal-btn" onclick="toggleReveal('pinip-${tab.id}',this)"><i class="ti ti-eye"></i></button>
-        <button class="btn btn-gold pin-set-btn" onclick="guardarPinAba('${tab.id}')"><i class="ti ti-check"></i> Guardar</button>
-        <button class="btn btn-ghost pin-set-btn" onclick="document.getElementById('pin-setup-${tab.id}').style.display='none'">Cancelar</button>
+        <button class="pin-reveal-btn" data-reveal-pin="${tab.id}"><i class="ti ti-eye"></i></button>
+        <button class="btn btn-gold pin-set-btn" data-guardar-pin="${tab.id}"><i class="ti ti-check"></i> Guardar</button>
+        <button class="btn btn-ghost pin-set-btn" data-fechar-pin="${tab.id}">Cancelar</button>
       </div>
     </div>`;
   }).join('');
@@ -2231,6 +2342,7 @@ window.editarEquipa    = editarEquipa;
 window.removerEquipa   = removerEquipa;
 window.guardarEquipa   = guardarEquipa;
 window.renderEquipas   = renderEquipas;
+window.editarVisita    = editarVisita;
 window.limparAgenda   = limparAgenda;
 window.sincronizarFiltros = sincronizarFiltros;
 window.fecharFiltros  = fecharFiltros;
