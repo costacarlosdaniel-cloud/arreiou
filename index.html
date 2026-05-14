@@ -1051,7 +1051,7 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
               <div class="pin-set-row">
                 <input type="password" inputmode="numeric" maxlength="4" id="input-login-pin"
                   class="pin-input-mini" placeholder="••••" oninput="this.value=this.value.replace(/\D/g,'')">
-                <button class="pin-reveal-btn" onclick="toggleReveal('input-login-pin',this)"><i class="ti ti-eye"></i></button>
+                <button class="pin-reveal-btn" onclick="window.toggleReveal&&window.toggleReveal('input-login-pin',this)"><i class="ti ti-eye"></i></button>
                 <button class="btn btn-gold pin-set-btn" onclick="window.guardarPinLogin&&window.guardarPinLogin()"><i class="ti ti-check"></i> Guardar</button>
               </div>
             </div>
@@ -1163,8 +1163,8 @@ const FIREBASE_CONFIG = {
 ════════════════════════════════════════ */
 const SHEET_ID  = '1ybnb1bMtRxwgcn6OL5fsZ6lD8XBkpXjY';
 const GV        = 'CARLOS DANIEL ALMEIDA COSTA';
-const GID_LOJAS = '1851992086';
-const GID_HC    = '230355303';
+const GID_LOJAS = '425057887';
+const GID_HC    = '2132335477';
 const csvURL    = gid => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
 const DB_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 horas
 
@@ -2289,6 +2289,7 @@ function toggleLoginPin(){
   }
 }
 
+window.toggleLoginPin=toggleLoginPin;
 function guardarPinLogin(){
   const v=(document.getElementById('input-login-pin')?.value||'').trim();
   if(!/^\d{4}$/.test(v)){alert('O PIN deve ter 4 dígitos.');return;}
@@ -2343,7 +2344,6 @@ window.removerEquipa   = removerEquipa;
 window.guardarEquipa   = guardarEquipa;
 window.renderEquipas   = renderEquipas;
 window.editarVisita    = editarVisita;
-window.limparAgenda   = limparAgenda;
 window.sincronizarFiltros = sincronizarFiltros;
 window.fecharFiltros  = fecharFiltros;
 window.calAnterior    = calAnterior;
