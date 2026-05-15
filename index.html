@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Karta">
 <title>Karta · Retail Intelligence</title>
-<meta name="karta-build" content="objetivos-supervisor-mes-lojas-v1">
+<meta name="karta-build" content="objetivos-supervisor-mes-lojas-vendas-gid-1828611820-v2">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230A0A0F'/%3E%3Crect x='7' y='7' width='7.5' height='7.5' rx='1.5' fill='white'/%3E%3Crect x='17' y='7' width='7.5' height='7.5' rx='1.5' fill='%230070F3' opacity='.7'/%3E%3Crect x='7' y='17' width='7.5' height='7.5' rx='1.5' fill='%230070F3'/%3E%3Crect x='17' y='17' width='7.5' height='7.5' rx='1.5' fill='white'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -684,9 +684,12 @@ window.addEventListener('unhandledrejection', function(e) {
 // ── LOW COST MODE ─────────────────────────────────────────────────────────
 // Objectivo: quase zero leituras repetidas e muito menos escritas.
 const KARTA_LOW_COST_MODE = true;
-const APPDATA_CACHE_TTL   = 6 * 60 * 60 * 1000;  // 6 horas — invalidação granular por escrita
-const QUERY_CACHE_TTL     = 2 * 60 * 60 * 1000;  // 2 horas — invalidação granular por escrita
+const APPDATA_CACHE_TTL   = 24 * 60 * 60 * 1000; // 24 horas — menos leituras em appData
+const QUERY_CACHE_TTL     = 12 * 60 * 60 * 1000; // 12 horas — menos leituras em queries KPI
 const WRITE_DEBOUNCE_MS   = 3000;                // agrupa edições rápidas (era 8s)
+// LOW COST extremo: listeners realtime desligados por defeito.
+// Para activar temporariamente no browser: localStorage.setItem('karta_realtime','1') e recarregar.
+const KARTA_REALTIME_MODE = localStorage.getItem('karta_realtime') === '1';
 
 
 // ── FIRESTORE COMPAT LAYER ──────────────────────────────────────────────────
@@ -912,9 +915,9 @@ function _mergeSupData(base, extra) {
   return base;
 }
 async function fbRefreshSupervisorReviews() {
-  // LOW COST: cache de 2h — evita re-ler em cada arranque
+  // LOW COST: cache de 12h — evita re-ler em cada arranque
   var _ck = 'karta_sup_reviews_ts';
-  var _ttl = 2 * 60 * 60 * 1000;
+  var _ttl = 12 * 60 * 60 * 1000;
   var _ts = +(localStorage.getItem(_ck) || 0);
   if ((Date.now() - _ts) < _ttl && localStorage.getItem('karta_sup_reviews_cache')) {
     try {
@@ -947,10 +950,10 @@ async function fbRefreshSupervisorReviews() {
 // ── Módulos separados em coleções próprias ───────────────────────────────────
 // Evita guardar tudo em appData como documentos gigantes.
 async function fbLoadMapCollection(colName) {
-  // LOW COST: cache em localStorage por 4h — evita re-ler colecções inteiras a cada arranque
+  // LOW COST: cache em localStorage por 24h — evita re-ler colecções inteiras a cada arranque
   var _ck  = 'karta_mapcol_' + colName;
   var _tsk = _ck + '_ts';
-  var _ttl = 4 * 60 * 60 * 1000; // 4 horas
+  var _ttl = 24 * 60 * 60 * 1000; // 24 horas
   try {
     var _ts  = +(localStorage.getItem(_tsk) || 0);
     var _hit = JSON.parse(localStorage.getItem(_ck) || 'null');
@@ -1309,6 +1312,7 @@ var _entriesLiveMes = null;
 var _entriesLiveUnsub = null;
 
 function fbStartEntriesLive(mes) {
+  if (KARTA_LOW_COST_MODE && !KARTA_REALTIME_MODE) { window._KARTA_DEBUG&&console.log('[FB] entries realtime desligado'); return; }
   if (_entriesLiveMes === mes && _entriesLiveUnsub) return; // já activo para este mês
   if (_entriesLiveUnsub) { try { _entriesLiveUnsub(); } catch(e){} }
   _entriesLiveMes = mes;
@@ -1369,6 +1373,7 @@ window.fbStartEntriesLive = fbStartEntriesLive;
 var _cashLiveUnsub = null;
 var _cashLiveStartedAt = 0;
 function fbStartCashLive() {
+  if (KARTA_LOW_COST_MODE && !KARTA_REALTIME_MODE) { window._KARTA_DEBUG&&console.log('[FB] cash realtime desligado'); return; }
   if (_cashLiveUnsub) return; // já activo
   // LOW COST: só arrancar o listener se passaram mais de 30 min desde o último arranque
   // (evita re-subscrever em reloads rápidos)
@@ -1416,6 +1421,7 @@ window.fbStartCashLive = fbStartCashLive;
 // Os dados estão em Firestore > inventory_counts (gravados por fbWriteInventoryCount)
 var _invLiveUnsub = null;
 function fbStartInventoryLive() {
+  if (KARTA_LOW_COST_MODE && !KARTA_REALTIME_MODE) { window._KARTA_DEBUG&&console.log('[FB] contagens realtime desligado'); return; }
   if (_invLiveUnsub) return; // já activo
   try {
     // Limitar aos últimos 7 dias por documentId (formato: YYYY-MM-DD__LOJA__turno)
@@ -1497,9 +1503,9 @@ async function fbLoadEntriesMonth(mes) {
   var _cacheKey = 'karta_em_' + mes;
   var _cacheTsKey = _cacheKey + '_ts';
   var _isCurMes = (mes === (new Date().toISOString().substring(0,7)));
-  // Mês actual: cache 2h (listener cobre os últimos 3 dias em tempo real)
-  // Mês passado: cache 24h (dados estáticos)
-  var _ttl = _isCurMes ? 6*60*60*1000 : 7*24*60*60*1000; // 6h mês actual, 7 dias mês passado
+  // Mês actual: cache 12h; mês passado: cache 14 dias.
+  // Como o realtime está desligado por defeito, a app usa cache e só relê em cache miss.
+  var _ttl = _isCurMes ? 12*60*60*1000 : 14*24*60*60*1000;
   // 1. Tentar cache localStorage
   try {
     var _ts = +(localStorage.getItem(_cacheTsKey) || 0);
@@ -1524,13 +1530,12 @@ async function fbLoadEntriesMonth(mes) {
     window._KARTA_DEBUG&&console.log('[FB] fbLoadEntriesMonth getDocs:', mes, Object.keys(_out).length, 'docs');
   } catch(_e) {
     window._KARTA_DEBUG&&console.warn('[FB] fbLoadEntriesMonth error:', _e);
-    // Fallback: se falhar (ex: índice em falta), tentar sem filtro e filtrar localmente
+    // Importante para reduzir leituras: não fazer fallback para a colecção inteira.
+    // Se existir cache antiga, usa-a mesmo expirada; caso contrário devolve vazio.
     try {
-      var _snap2 = await getDocs(collection(db, ENTRIES_COL));
-      _snap2.forEach(function(d) { var _dd = d.data(); if ((_dd.mes || '') === mes) _out[_dd.key || d.id] = _dd.value || {}; });
-      try { localStorage.setItem(_cacheKey, JSON.stringify(_out)); localStorage.setItem(_cacheTsKey, String(Date.now())); } catch(e2) {}
-      window._KARTA_DEBUG&&console.log('[FB] fbLoadEntriesMonth fallback:', mes, Object.keys(_out).length, 'docs');
-    } catch(_e2) { window._KARTA_DEBUG&&console.warn('[FB] fbLoadEntriesMonth fallback error:', _e2); }
+      var _stale = localStorage.getItem(_cacheKey);
+      if (_stale) return JSON.parse(_stale);
+    } catch(_e2) {}
   }
   return _out;
 }
@@ -1623,9 +1628,9 @@ function fbListenAll() {
     window.ADM_DATA = val;
     try { localStorage.setItem('arreiou_adm_obj_v1', JSON.stringify(val)); } catch(e) {}
   }).catch(function(){});
-  // Escalas (templates) — one-shot com cache de 2h
+  // Escalas (templates) — one-shot com cache de 12h
   (function() {
-    var _ck = 'arreiou_escala_v2', _tsk = '_karta_escala_ts', _ttl = 2*60*60*1000;
+    var _ck = 'arreiou_escala_v2', _tsk = '_karta_escala_ts', _ttl = 12*60*60*1000;
     var _ts = +(localStorage.getItem(_tsk)||0);
     var _hit = localStorage.getItem(_ck);
     if (_hit && (Date.now()-_ts) < _ttl) {
@@ -2165,36 +2170,36 @@ window.addEventListener('load', async function() {
     await fbMigrateOnce();
     fbListenEntries();
     fbListenAll();
-    // Listeners em tempo real — arrancam com delay de 90s após o boot
-    // Razão: utilizadores que abrem e fecham rapidamente não consomem leituras
-    // Os dados recentes já estão em localStorage; o listener só é necessário para sincronização
-    var _LISTENER_DELAY = 90 * 1000; // 90 segundos (era 45s)
-    var _listenersTimer = setTimeout(function() {
-      // LOW COST: não arrancar listeners se o tab estiver escondido (ex: app em background no telemóvel)
-      if (document.hidden) {
-        window._KARTA_DEBUG&&console.log('[FB] Tab escondido — listeners adiados');
-        // Tentar quando o tab ficar visível
-        var _onVis = function() {
-          if (!document.hidden) {
-            document.removeEventListener('visibilitychange', _onVis);
-            fbStartCashLive();
-            fbStartInventoryLive();
-            var _mesCur = new Date().toISOString().substring(0, 7);
-            fbStartEntriesLive(_mesCur);
-            window._KARTA_DEBUG&&console.log('[FB] Listeners activados ao ficar visível');
-          }
-        };
-        document.addEventListener('visibilitychange', _onVis);
-        return;
-      }
-      fbStartCashLive();
-      fbStartInventoryLive();
-      var _mesCur = new Date().toISOString().substring(0, 7);
-      fbStartEntriesLive(_mesCur);
-      window._KARTA_DEBUG&&console.log('[FB] Listeners em tempo real activados');
-    }, _LISTENER_DELAY);
-    // Cancelar se utilizador sair antes dos 90s (sem leituras desnecessárias)
-    window.addEventListener('beforeunload', function() { clearTimeout(_listenersTimer); });
+    // Listeners em tempo real desligados por defeito para reduzir leituras Firebase.
+    // Activação manual de emergência: localStorage.setItem('karta_realtime','1') e recarregar.
+    if (KARTA_REALTIME_MODE) {
+      var _LISTENER_DELAY = 10 * 60 * 1000; // 10 minutos
+      var _listenersTimer = setTimeout(function() {
+        if (document.hidden) {
+          window._KARTA_DEBUG&&console.log('[FB] Tab escondido — listeners adiados');
+          var _onVis = function() {
+            if (!document.hidden) {
+              document.removeEventListener('visibilitychange', _onVis);
+              fbStartCashLive();
+              fbStartInventoryLive();
+              var _mesCur = new Date().toISOString().substring(0, 7);
+              fbStartEntriesLive(_mesCur);
+              window._KARTA_DEBUG&&console.log('[FB] Listeners activados ao ficar visível');
+            }
+          };
+          document.addEventListener('visibilitychange', _onVis);
+          return;
+        }
+        fbStartCashLive();
+        fbStartInventoryLive();
+        var _mesCur = new Date().toISOString().substring(0, 7);
+        fbStartEntriesLive(_mesCur);
+        window._KARTA_DEBUG&&console.log('[FB] Listeners em tempo real activados');
+      }, _LISTENER_DELAY);
+      window.addEventListener('beforeunload', function() { clearTimeout(_listenersTimer); });
+    } else {
+      window._KARTA_DEBUG&&console.log('[FB] Realtime OFF: modo menos leituras activo');
+    }
     // Migração desactivada — inventory_counts só guarda dados novos (a partir de agora)
     // Notificações SM realtime
     // LOW COST: notificações SM realtime desativadas no arranque.
@@ -3974,17 +3979,40 @@ async function paoFetchRows(){
 // Folha específica das VENDAS. Usar GID evita ler uma aba errada quando há folhas com nomes semelhantes.
 // Link confirmado pelo utilizador: .../edit?gid=1828611820#gid=1828611820
 const SALES_GID = '1828611820';
-const SALES_GIDS = ['1828611820', '1185965867']; // fallback para GID antigo
+const SALES_GIDS = ['1828611820'];
+// Link CSV publicado na Web confirmado pelo utilizador.
+// Este link é mais estável do que /gviz ou /export quando o ficheiro veio de XLSX
+// e evita erros de CORS/Failed to fetch na aba SalesKPIsStore.
+const SALES_PUBLISHED_ID = '2PACX-1vQ0kvVXS-BM-E7SHdwY_6_3tOHVjHoNLmrrVOaEkLy5W_n2PwJrc8WnPGSnI8TGbQ';
+const SALES_PUBLISHED_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/' + SALES_PUBLISHED_ID + '/pub?gid=' + SALES_GID + '&single=true&output=csv';
+const SALES_PUBLISHED_CSV_URL_DOC = 'https://docs.google.com/spreadsheets/d/e/' + SALES_PUBLISHED_ID + '/pub?output=csv';
 window.SALES_GID = SALES_GID;
 window.SALES_GIDS = SALES_GIDS;
+window.SALES_PUBLISHED_ID = SALES_PUBLISHED_ID;
+window.SALES_PUBLISHED_CSV_URL = SALES_PUBLISHED_CSV_URL;
+window.SALES_PUBLISHED_CSV_URL_DOC = SALES_PUBLISHED_CSV_URL_DOC;
 function salesSheetUrl(extra){
+  // Para leitura completa, usar o CSV publicado com gid+single. O link publicado NÃO suporta tq=...
+  // e alguns ficheiros importados de XLSX dão 404 no formato /pub?output=csv sem gid.
+  if(!extra && window.SALES_PUBLISHED_CSV_URL) return window.SALES_PUBLISHED_CSV_URL;
   return 'https://docs.google.com/spreadsheets/d/' + GS_ID + '/gviz/tq?tqx=out:csv&gid=' + SALES_GID + (extra || '') + '&t=' + Date.now();
 }
 function salesSheetCandidateUrls(extra){
   var ts = Date.now(), seen = {}, out = [];
   function add(u){ if(u && !seen[u]){ seen[u]=1; out.push(u); } }
+  // Primeiro: CSV publicado da aba SalesKPIsStore pelo GID correcto.
+  if(!extra && window.SALES_PUBLISHED_CSV_URL){
+    add(window.SALES_PUBLISHED_CSV_URL);
+  }
+  // Segundo: CSV publicado do documento inteiro, útil quando o Google ignora o gid.
+  if(!extra && window.SALES_PUBLISHED_CSV_URL_DOC){
+    add(window.SALES_PUBLISHED_CSV_URL_DOC);
+  }
   (window.SALES_GIDS || SALES_GIDS).forEach(function(g){
     add('https://docs.google.com/spreadsheets/d/' + GS_ID + '/gviz/tq?tqx=out:csv&gid=' + g + (extra || '') + '&t=' + ts);
+    if(!extra && window.SALES_PUBLISHED_ID){
+      add('https://docs.google.com/spreadsheets/d/e/' + window.SALES_PUBLISHED_ID + '/pub?gid=' + g + '&single=true&output=csv');
+    }
   });
   ['SalesKPIsStore','Sales KPIs Store','SalesKpisStore'].forEach(function(n){
     add('https://docs.google.com/spreadsheets/d/' + GS_ID + '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(n) + (extra || '') + '&t=' + ts);
@@ -4018,8 +4046,8 @@ function gsStatus(msg, cls){
 }
 
 async function fetchCSV(url){
-  const resp = await fetch(url);
-  if(!resp.ok) throw new Error('HTTP ' + resp.status);
+  const resp = await fetch(url, { cache: 'no-store', redirect: 'follow' });
+  if(!resp.ok) throw new Error('HTTP ' + resp.status + ' em ' + url); 
   const text = await resp.text();
   return Papa ? Papa.parse(text, {skipEmptyLines:true}).data : csvParse(text);
 }
@@ -4120,6 +4148,73 @@ function numAny(v){
   return isNaN(n) ? null : n;
 }
 
+
+// Fallback robusto para SalesKPIsStore sem query GViz: lê CSV completo e mapeia por headers.
+// Garante Venda SAP, Ticket Médio e Nº Clientes mesmo quando o Query Language falha por locale/tipos.
+async function salesSyncRawFallback(){
+  var raw = await salesFetchCSV('');
+  if(!raw || raw.length < 2) throw new Error('SalesKPIsStore sem dados no fallback');
+  var h = raw[0] || [];
+  function norm(x){return String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\[\]_]/g,' ').replace(/\s+/g,' ').trim();}
+  function idx(cands, def){
+    var hn = h.map(norm);
+    for(var c=0;c<cands.length;c++){
+      var needle = norm(cands[c]);
+      for(var i=0;i<hn.length;i++){ if(hn[i].indexOf(needle)>=0) return i; }
+    }
+    return def;
+  }
+  var iD  = idx(['tempo date','date','data'], 0);
+  var iC  = idx(['nro centro','nr centro','centro'], 1);
+  var iMes= idx(['tempo mes ano','mes ano','mes'], 5);
+  var iV  = idx(['vendas liquidas','venda liquida','vendas media dia loja','venda sap'], 7);
+  var iT  = idx(['ticket medio','ticket'], 8);
+  var iCl = idx(['n clientes medios','clientes medios','clientes'], 9);
+
+  var monthly = {}; // centro -> mes -> {vt, tkSum, clSum, n}
+  for(var r=1;r<raw.length;r++){
+    var row=raw[r];
+    var centro=String(row[iC]||'').trim(); if(!centro) continue;
+    var ds=pd(row[iD]);
+    var mes='';
+    var mesRaw=String(row[iMes]||'').trim();
+    if(/^\d{2}\/\d{4}$/.test(mesRaw)){var pp=mesRaw.split('/'); mes=pp[1]+'-'+pp[0];}
+    else if(/^\d{4}-\d{2}/.test(mesRaw)) mes=mesRaw.substring(0,7);
+    else if(ds) mes=ds.substring(0,7);
+    if(!mes) continue;
+    var vt=numAny(row[iV]);
+    var tk=numAny(row[iT]);
+    var cl=numAny(row[iCl]);
+    if(!monthly[centro]) monthly[centro]={};
+    if(!monthly[centro][mes]) monthly[centro][mes]={vt:0,tkSum:0,tkN:0,clSum:0,clN:0,n:0};
+    var m=monthly[centro][mes];
+    if(vt!=null){ m.vt += vt; m.n++; }
+    if(tk!=null){ m.tkSum += tk; m.tkN++; }
+    if(cl!=null){ m.clSum += cl; m.clN++; }
+    if(ds){ upsRow(centro, ds, {
+      vs: vt!=null ? Math.round(vt) : null,
+      tk: tk!=null ? Math.round(tk) : null,
+      cl: cl!=null ? Math.round(cl) : null
+    }); }
+  }
+  if(SALES_DATA && SALES_DATA.lm){
+    Object.keys(monthly).forEach(function(c){
+      if(!SALES_DATA.lm[c]) SALES_DATA.lm[c]={};
+      Object.keys(monthly[c]).forEach(function(mes){
+        var m=monthly[c][mes];
+        SALES_DATA.lm[c][mes]=Object.assign(SALES_DATA.lm[c][mes]||{}, {
+          vt: Math.round(m.vt),
+          vs: m.n>0 ? Math.round(m.vt/m.n) : null,
+          tk: m.tkN>0 ? Math.round(m.tkSum/m.tkN) : null,
+          cl: m.clN>0 ? Math.round(m.clSum/m.clN) : null,
+          n: Math.round(m.n)
+        });
+      });
+    });
+  }
+  return true;
+}
+
 async function gsSyncAll(){
   gsStatus('A sincronizar…');
   // Limpar cache de entries da loja/ano activo para forçar re-fetch do Firebase
@@ -4135,7 +4230,7 @@ async function gsSyncAll(){
   var errors = [];
   var updated = 0;
 
-  // ── SalesKPIsStore — lê pela folha GID 1185965867 e usa query SQL no servidor para agregar por centro+mês (evita limite de 1000 linhas) ──
+  // ── SalesKPIsStore — lê pela folha GID 1828611820 e usa query SQL no servidor para agregar por centro+mês (evita limite de 1000 linhas) ──
   try{
     // GViz query: SUM(Vendas_Liquidas), AVG(Ticket), AVG(Clientes) GROUP BY NroCentro, MesAno
     // Columns: A=Date, B=NroCentro, C=Loja, D=NomeGV, E=NomeSupervisor, F=MesAno, G=MesNum, H=Vendas_Liquidas, I=Ticket, J=Clientes, K=VendaMediaDia
@@ -4186,7 +4281,8 @@ async function gsSyncAll(){
       var _mn = mesNum - _mi;
       var _yn = anoNum;
       while(_mn<=0){_mn+=12;_yn--;}
-      monthFilters.push('(year(A)='+_yn+' and month(A)='+_mn+')');
+      // Google Visualization Query: month(A) é zero-based (Jan=0, Mai=4)
+      monthFilters.push('(year(A)='+_yn+' and month(A)='+(_mn-1)+')');
     }
     var sqlD = encodeURIComponent(
       "select A, B, H, I, J where " + monthFilters.join(' or ') +
@@ -4206,7 +4302,14 @@ async function gsSyncAll(){
       upsRow(centro2,ds,{vs:vval!=null?Math.round(vval):null,tk:tval!=null?Math.round(tval):null,cl:cval!=null?Math.round(cval):null});
     }
     gsStatus('Vendas ✓…');
-  } catch(e){ errors.push('SalesKPIsStore (gid 1185965867): '+e.message); }
+  } catch(e){
+    try{
+      await salesSyncRawFallback();
+      gsStatus('Vendas ✓ fallback…');
+    }catch(e2){
+      errors.push('SalesKPIsStore (gid 1828611820): '+e.message+' | fallback: '+e2.message);
+    }
+  }
 
   // ── RuturaLojaseCDs: A=Centro, B=Data, C=SumResp_Lojas_ ──
   try{
@@ -24561,7 +24664,7 @@ window.contAdmLoadSheet = function() {
   if (res)    { res.style.display = 'none'; }
 
   // GS_ID é const noutro script — não entra no window automaticamente
-  var _gsId = window.GS_ID || '1ybnb1bMtRxwgcn6OL5fsZ6lD8XBkpXjY';
+  var _gsId = window.GS_ID || '1ybnb1bMtRxwgcn6OL5fsZ6ID8XBkpXjY';
   var sheetName = 'SalesKPIsStore 1';
   var url = 'https://docs.google.com/spreadsheets/d/' + _gsId + '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(sheetName) + '&t=' + Date.now();
 

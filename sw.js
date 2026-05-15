@@ -1,7 +1,7 @@
 // ── Arreiou KPI — Service Worker ─────────────────────────────────────────────
 // Combina: cache de libs CDN (original) + suporte offline completo (novo)
 
-const CACHE_NAME = 'karta-20260515002'; // ← actualizar com cada deploy (igual ao app-version)
+const CACHE_NAME = 'karta-20260515001'; // ← actualizar com cada deploy (igual ao app-version)
 
 // Libs CDN a fazer cache — evita re-download e funciona offline
 const CACHEABLE_CDN = [
