@@ -3980,16 +3980,39 @@ async function paoFetchRows(){
 // Link confirmado pelo utilizador: .../edit?gid=1828611820#gid=1828611820
 const SALES_GID = '1828611820';
 const SALES_GIDS = ['1828611820'];
+// Link CSV publicado na Web confirmado pelo utilizador.
+// Este link é mais estável do que /gviz ou /export quando o ficheiro veio de XLSX
+// e evita erros de CORS/Failed to fetch na aba SalesKPIsStore.
+const SALES_PUBLISHED_ID = '2PACX-1vQ0kvVXS-BM-E7SHdwY_6_3tOHVjHoNLmrrVOaEkLy5W_n2PwJrc8WnPGSnI8TGbQ';
+const SALES_PUBLISHED_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/' + SALES_PUBLISHED_ID + '/pub?gid=' + SALES_GID + '&single=true&output=csv';
+const SALES_PUBLISHED_CSV_URL_DOC = 'https://docs.google.com/spreadsheets/d/e/' + SALES_PUBLISHED_ID + '/pub?output=csv';
 window.SALES_GID = SALES_GID;
 window.SALES_GIDS = SALES_GIDS;
+window.SALES_PUBLISHED_ID = SALES_PUBLISHED_ID;
+window.SALES_PUBLISHED_CSV_URL = SALES_PUBLISHED_CSV_URL;
+window.SALES_PUBLISHED_CSV_URL_DOC = SALES_PUBLISHED_CSV_URL_DOC;
 function salesSheetUrl(extra){
+  // Para leitura completa, usar o CSV publicado com gid+single. O link publicado NÃO suporta tq=...
+  // e alguns ficheiros importados de XLSX dão 404 no formato /pub?output=csv sem gid.
+  if(!extra && window.SALES_PUBLISHED_CSV_URL) return window.SALES_PUBLISHED_CSV_URL;
   return 'https://docs.google.com/spreadsheets/d/' + GS_ID + '/gviz/tq?tqx=out:csv&gid=' + SALES_GID + (extra || '') + '&t=' + Date.now();
 }
 function salesSheetCandidateUrls(extra){
   var ts = Date.now(), seen = {}, out = [];
   function add(u){ if(u && !seen[u]){ seen[u]=1; out.push(u); } }
+  // Primeiro: CSV publicado da aba SalesKPIsStore pelo GID correcto.
+  if(!extra && window.SALES_PUBLISHED_CSV_URL){
+    add(window.SALES_PUBLISHED_CSV_URL);
+  }
+  // Segundo: CSV publicado do documento inteiro, útil quando o Google ignora o gid.
+  if(!extra && window.SALES_PUBLISHED_CSV_URL_DOC){
+    add(window.SALES_PUBLISHED_CSV_URL_DOC);
+  }
   (window.SALES_GIDS || SALES_GIDS).forEach(function(g){
     add('https://docs.google.com/spreadsheets/d/' + GS_ID + '/gviz/tq?tqx=out:csv&gid=' + g + (extra || '') + '&t=' + ts);
+    if(!extra && window.SALES_PUBLISHED_ID){
+      add('https://docs.google.com/spreadsheets/d/e/' + window.SALES_PUBLISHED_ID + '/pub?gid=' + g + '&single=true&output=csv');
+    }
   });
   ['SalesKPIsStore','Sales KPIs Store','SalesKpisStore'].forEach(function(n){
     add('https://docs.google.com/spreadsheets/d/' + GS_ID + '/gviz/tq?tqx=out:csv&sheet=' + encodeURIComponent(n) + (extra || '') + '&t=' + ts);
@@ -4023,8 +4046,8 @@ function gsStatus(msg, cls){
 }
 
 async function fetchCSV(url){
-  const resp = await fetch(url);
-  if(!resp.ok) throw new Error('HTTP ' + resp.status);
+  const resp = await fetch(url, { cache: 'no-store', redirect: 'follow' });
+  if(!resp.ok) throw new Error('HTTP ' + resp.status + ' em ' + url); 
   const text = await resp.text();
   return Papa ? Papa.parse(text, {skipEmptyLines:true}).data : csvParse(text);
 }
