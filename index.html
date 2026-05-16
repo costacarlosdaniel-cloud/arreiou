@@ -2,64 +2,107 @@
 <html lang="pt">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0070F3" />
   <meta name="robots" content="noindex,nofollow,noarchive" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>Karta · Retail Intelligence</title>
+  <title>Karta V2 · Retail Intelligence</title>
   <link rel="manifest" href="./manifest.json" />
-  <link rel="icon" href="./icon-192.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="icon" href="./assets/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/base.css" />
+  <link rel="stylesheet" href="./css/layout.css" />
+  <link rel="stylesheet" href="./css/mobile.css" />
 </head>
 <body>
-  <header class="hdr">
-    <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
-    <div class="brand">Karta</div>
-    <div class="divider"></div>
-    <div class="subtitle">Retail Intelligence</div>
-    <div class="spacer"></div>
-    <button id="btnSync" class="btn primary">Atualizar Sheet</button>
-    <span id="syncState" class="state"></span>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div>
+        <strong>Karta V2</strong>
+        <small>Retail Intelligence</small>
+      </div>
+    </div>
+    <div class="status" id="app-status">A iniciar…</div>
   </header>
 
-  <main class="app-shell">
-    <aside class="side">
-      <input id="storeSearch" class="search" placeholder="Pesquisar loja..." />
-      <nav id="storeList" class="store-list"></nav>
-    </aside>
+  <aside class="sidebar">
+    <button class="nav-item active" data-view="dashboard">Dashboard</button>
+    <button class="nav-item" data-view="stores">Lojas</button>
+    <button class="nav-item" data-view="kpis">KPIs</button>
+    <button class="nav-item" data-view="inventory">Contagens</button>
+    <button class="nav-item" data-view="settings">Sistema</button>
+  </aside>
 
-    <section class="workspace">
-      <nav class="tabs" id="tabs">
-        <button data-view="kpi" class="active">KPI</button>
-        <button data-view="analises">Análises</button>
-        <button data-view="contagens">Contagens</button>
-        <button data-view="escalas">Escalas</button>
-        <button data-view="supervisores">Roteiro</button>
-        <button data-view="admin">Admin</button>
-      </nav>
+  <main class="main">
+    <section class="view active" id="view-dashboard">
+      <div class="page-head">
+        <h1>Dashboard</h1>
+        <p>Base modular ligada ao Firebase novo.</p>
+      </div>
+      <div class="cards">
+        <article class="card">
+          <span class="label">Estado Firebase</span>
+          <strong id="firebase-state">A validar…</strong>
+        </article>
+        <article class="card">
+          <span class="label">Lojas carregadas</span>
+          <strong id="store-count">0</strong>
+        </article>
+        <article class="card">
+          <span class="label">Utilizador</span>
+          <strong id="user-state">—</strong>
+        </article>
+      </div>
+    </section>
 
-      <section id="view-kpi" class="view active"></section>
-      <section id="view-analises" class="view"></section>
-      <section id="view-contagens" class="view"></section>
-      <section id="view-escalas" class="view"></section>
-      <section id="view-supervisores" class="view"></section>
-      <section id="view-admin" class="view"></section>
+    <section class="view" id="view-stores">
+      <div class="page-head row">
+        <div>
+          <h1>Lojas</h1>
+          <p>Lidas da coleção <code>stores</code>.</p>
+        </div>
+        <button class="primary" id="refresh-stores">Atualizar</button>
+      </div>
+      <div class="panel">
+        <table>
+          <thead>
+            <tr><th>Código</th><th>Nome</th><th>Supervisor</th><th>Gerente</th><th>Ativa</th></tr>
+          </thead>
+          <tbody id="stores-table">
+            <tr><td colspan="5">A carregar lojas…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="view" id="view-kpis">
+      <div class="page-head"><h1>KPIs</h1><p>Módulo reservado para migração.</p></div>
+      <div class="empty">Próximo módulo a implementar.</div>
+    </section>
+
+    <section class="view" id="view-inventory">
+      <div class="page-head"><h1>Contagens</h1><p>Módulo reservado para inventários.</p></div>
+      <div class="empty">Próximo módulo a implementar.</div>
+    </section>
+
+    <section class="view" id="view-settings">
+      <div class="page-head"><h1>Sistema</h1><p>Diagnóstico da app.</p></div>
+      <div class="panel diagnostics" id="diagnostics"></div>
     </section>
   </main>
 
-  <nav class="bottom-nav" id="bottomNav">
-    <button data-view="kpi" class="active">KPI</button>
-    <button data-view="analises">Análises</button>
-    <button data-view="contagens">Contagens</button>
-    <button data-view="escalas">Escalas</button>
-    <button data-view="admin">Admin</button>
+  <nav class="mobile-nav">
+    <button class="active" data-view="dashboard">Início</button>
+    <button data-view="stores">Lojas</button>
+    <button data-view="kpis">KPIs</button>
+    <button data-view="inventory">Cont.</button>
+    <button data-view="settings">Sistema</button>
   </nav>
 
-  <div id="toast" class="toast"></div>
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./js/app.js"></script>
 </body>
 </html>
