@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Limpus">
 <meta name="theme-color" content="#0D1B2A">
-<title>Limpus · Gestão de Higiene</title>
+<title>Limpus · Gestão de Higiene [v3-1442-corrigido-gviz]</title>
 <link rel="manifest" href="limpus-manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
@@ -1163,12 +1163,18 @@ const FIREBASE_CONFIG = {
 ════════════════════════════════════════ */
 const SHEET_ID  = '1ybnb1bMtRxwgcn6OL5fsZ6lD8XBkpXjY';
 const GV        = 'CARLOS DANIEL ALMEIDA COSTA';
+// GIDs conhecidos. Se algum GID mudar, a app tenta encontrar automaticamente pelo nome da aba.
 const GID_LOJAS = '1442211016'; // SalesKPIsStore 2
-const GID_HC    = '110271422'; // HeadcountReport2025
+const GID_HC    = '110271422';  // HeadcountReport2025
 // URL /e/2PACX-… gerado pelo "Publicar na web" — tem headers CORS corretos para fetch no browser
 const PUBLISH_BASE = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0kvVXS-BM-E7SHdwY_6_3tOHVjHoNLmnrVOaEkLy5W_n2PwJrc8WnPGSnl8TGbQ';
-const csvURL = gid => `${PUBLISH_BASE}/pub?output=csv&gid=${gid}`;
+const csvURL    = gid => `${PUBLISH_BASE}/pub?output=csv&gid=${gid}&_=${Date.now()}`;
+const csvURLAlt = gid => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}&_=${Date.now()}`;
+// Mais robusto: lê pelo NOME da aba via Google Visualization API.
+// Assim a app não quebra quando o Google Sheets muda o gid ao duplicar/importar o ficheiro.
+const csvURLSheet = nome => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(nome)}&_=${Date.now()}`;
 const DB_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 horas
+const _gidCache = {};
 
 /* ════════════════════════════════════════
    FIREBASE INIT
@@ -1256,17 +1262,124 @@ function parseCSV(txt) {
   });
 }
 
-async function fetchCSV(gid, nome) {
-  const url = csvURL(gid);
+function _normalizarNomeAba(v) {
+  return String(v || '')
+    .replace(/&amp;/g,'&')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/<[^>]*>/g,'')
+    .trim()
+    .toLowerCase();
+}
+
+async function resolverGidPorNome(nome) {
+  const key = _normalizarNomeAba(nome);
+  if (_gidCache[key]) return _gidCache[key];
+
+  const urls = [
+    `${PUBLISH_BASE}/pubhtml?_=${Date.now()}`,
+    `https://docs.google.com/spreadsheets/d/${SHEET_ID}/pubhtml?_=${Date.now()}`
+  ];
+
+  for (const url of urls) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const html = await r.text();
+
+      // Formato normal do Google Sheets publicado: links das abas com gid no href.
+      const re = /<a[^>]+gid=(\d+)[^>]*>([\s\S]*?)<\/a>/gi;
+      let m;
+      while ((m = re.exec(html))) {
+        const gidEncontrado = m[1];
+        const nomeEncontrado = _normalizarNomeAba(m[2]);
+        if (nomeEncontrado === key) {
+          _gidCache[key] = gidEncontrado;
+          console.log(`[GID] ${nome} encontrado automaticamente:`, gidEncontrado);
+          return gidEncontrado;
+        }
+      }
+
+      // Fallback: procurar o texto da aba perto de um gid.
+      const idx = _normalizarNomeAba(html).indexOf(key);
+      if (idx >= 0) {
+        const fatia = html.slice(Math.max(0, idx - 800), idx + 800);
+        const gidMatch = fatia.match(/gid=(\d+)/i);
+        if (gidMatch) {
+          _gidCache[key] = gidMatch[1];
+          console.log(`[GID] ${nome} encontrado por fallback:`, gidMatch[1]);
+          return gidMatch[1];
+        }
+      }
+    } catch(e) {
+      console.warn('[GID] Não consegui ler pubhtml:', e.message);
+    }
+  }
+  return null;
+}
+
+async function _lerCSVUrl(url, nome) {
   console.log(`[fetchCSV] ${nome} →`, url);
-  const r = await fetch(url);
+  const r = await fetch(url, { cache: 'no-store' });
   if (!r.ok) throw new Error(`HTTP ${r.status} — "${nome}"`);
   const text = await r.text();
-  // Detectar resposta HTML em vez de CSV (folha não publicada ou GID errado)
-  if (text.trim().startsWith('<!')) throw new Error(`Resposta HTML recebida — "${nome}" (GID incorreto ou folha não publicada)`);
+  const t = text.trim();
+  if (t.startsWith('<!') || t.startsWith('<html')) {
+    throw new Error(`HTML recebido — "${nome}" (aba não publicada, nome inválido ou permissão insuficiente)`);
+  }
   const rows = parseCSV(text);
-  if (rows.length > 0) console.log(`[${nome}] cols:`, Object.keys(rows[0]).join(', '));
+  if (!rows.length) throw new Error(`CSV vazio — "${nome}"`);
+  console.log(`[${nome}] ✓ cols:`, Object.keys(rows[0]).join(', '));
   return rows;
+}
+
+async function _tentarCSV(gid, nome) {
+  const urls = [];
+
+  // 1) Primeiro tenta pelo NOME da aba. É o método mais estável.
+  urls.push(csvURLSheet(nome));
+
+  // 2) Depois tenta pelos GIDs conhecidos/publicados.
+  if (gid) {
+    urls.push(csvURL(gid));
+    urls.push(csvURLAlt(gid));
+  }
+
+  let lastErr = null;
+  for (const url of urls) {
+    try {
+      return await _lerCSVUrl(url, nome);
+    } catch(e) {
+      lastErr = e;
+      console.warn(`[fetchCSV] Falhou ${nome}:`, e.message);
+    }
+  }
+  throw lastErr;
+}
+
+async function fetchCSV(gid, nome) {
+  let lastErr = null;
+
+  // 1) Tenta pelo nome da aba e pelo GID configurado.
+  try {
+    return await _tentarCSV(gid, nome);
+  } catch(e) {
+    lastErr = e;
+    console.warn(`[fetchCSV] Falhou leitura inicial para ${nome}:`, e.message);
+  }
+
+  // 2) Se o GID mudou, tenta descobrir automaticamente pelo nome da aba publicada.
+  const gidAuto = await resolverGidPorNome(nome);
+  if (gidAuto && String(gidAuto) !== String(gid)) {
+    try {
+      return await _tentarCSV(gidAuto, nome);
+    } catch(e) {
+      lastErr = e;
+      console.warn(`[fetchCSV] Falhou com GID automático (${gidAuto}) para ${nome}:`, e.message);
+    }
+  }
+
+  throw lastErr || new Error(`Não foi possível carregar a aba "${nome}"`);
 }
 
 /* ════════════════════════════════════════
