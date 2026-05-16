@@ -1164,9 +1164,10 @@ const FIREBASE_CONFIG = {
 const SHEET_ID  = '1ybnb1bMtRxwgcn6OL5fsZ6lD8XBkpXjY';
 const GV        = 'CARLOS DANIEL ALMEIDA COSTA';
 const GID_LOJAS = '1029496560'; // SalesKPIsStore 2
-const GID_HC    = '2132335477'; // HeadcountReport2025 — confirmar GID se continuar a falhar
-// Usa /pub em vez de /export — mais estável para folhas publicadas na web
-const csvURL    = gid => `https://docs.google.com/spreadsheets/d/${SHEET_ID}/pub?output=csv&gid=${gid}`;
+const GID_HC    = '2132335477'; // HeadcountReport2025
+// URL /e/2PACX-… gerado pelo "Publicar na web" — tem headers CORS corretos para fetch no browser
+const PUBLISH_BASE = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0kvVXS-BM-E7SHdwY_6_3tOHVjHoNLmnrVOaEkLy5W_n2PwJrc8WnPGSnl8TGbQ';
+const csvURL = gid => `${PUBLISH_BASE}/pub?output=csv&gid=${gid}`;
 const DB_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 horas
 
 /* ════════════════════════════════════════
@@ -1256,7 +1257,9 @@ function parseCSV(txt) {
 }
 
 async function fetchCSV(gid, nome) {
-  const r = await fetch(csvURL(gid));
+  const url = csvURL(gid);
+  console.log(`[fetchCSV] ${nome} →`, url);
+  const r = await fetch(url);
   if (!r.ok) throw new Error(`HTTP ${r.status} — "${nome}"`);
   const rows = parseCSV(await r.text());
   if (rows.length > 0) console.log(`[${nome}] cols:`, Object.keys(rows[0]).join(', '));
