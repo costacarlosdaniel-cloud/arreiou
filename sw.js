@@ -1,97 +1,13 @@
-// ── Karta · Retail Intelligence — Service Worker ─────────────────────────────
-const CACHE_NAME = 'karta-20260516001'; // ← actualizar com cada deploy
-
-const CACHEABLE_CDN = [
-  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
-  'https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap',
-];
-
-self.addEventListener('install', function(e) {
-  self.skipWaiting();
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      return Promise.all([
-        cache.add('/index.html').catch(function() {}),
-        cache.addAll(CACHEABLE_CDN).catch(function() {})
-      ]);
-    })
-  );
-});
-
-self.addEventListener('activate', function(e) {
-  e.waitUntil(
-    caches.keys().then(function(keys) {
-      return Promise.all(
-        keys.filter(function(k) { return k !== CACHE_NAME; })
-            .map(function(k) { return caches.delete(k); })
-      );
-    }).then(function() {
-      return self.clients.claim();
-    }).then(function() {
-      return self.clients.matchAll({ type: 'window' }).then(function(clients) {
-        clients.forEach(function(client) {
-          client.postMessage({ type: 'NEW_VERSION' });
-        });
-      });
-    })
-  );
-});
-
-self.addEventListener('fetch', function(e) {
-  var url = e.request.url;
-  var method = e.request.method;
-
-  if (method !== 'GET' ||
-      url.includes('firebaseio.com') ||
-      url.includes('googleapis.com/spreadsheets') ||
-      url.includes('docs.google.com') ||
-      url.includes('gstatic.com/firebasejs') ||
-      url.includes('anthropic.com') ||
-      url.includes('firestore.googleapis.com')) {
+const CACHE_NAME = 'karta-nova-20260516001';
+const ASSETS = ['/', '/index.html', '/styles.css', '/app.js', '/data.js', '/ui.js', '/firebase.js', '/manifest.json', '/icon-192.png', '/icon-512.png'];
+self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS).catch(()=>{}))); });
+self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))).then(()=>self.clients.claim())); });
+self.addEventListener('fetch', e => {
+  const url = e.request.url;
+  if (e.request.method !== 'GET' || url.includes('docs.google.com') || url.includes('googleapis.com') || url.includes('gstatic.com/firebasejs')) return;
+  if (e.request.mode === 'navigate') {
+    e.respondWith(fetch(e.request,{cache:'no-store'}).then(r => { const c=r.clone(); caches.open(CACHE_NAME).then(x=>x.put('/index.html',c)); return r; }).catch(()=>caches.match('/index.html')));
     return;
   }
-
-  // index.html: network-first, fallback cache offline
-  if (url.endsWith('/') || url.endsWith('/index.html') || e.request.mode === 'navigate') {
-    e.respondWith(
-      fetch(e.request, { cache: 'no-store' })
-        .then(function(r) {
-          var clone = r.clone();
-          caches.open(CACHE_NAME).then(function(c) { c.put(e.request, clone); });
-          return r;
-        })
-        .catch(function() { return caches.match('/index.html'); })
-    );
-    return;
-  }
-
-  // Libs CDN: cache-first
-  if (url.includes('cdnjs.cloudflare.com') ||
-      url.includes('fonts.googleapis.com') ||
-      url.includes('fonts.gstatic.com')) {
-    e.respondWith(
-      caches.match(e.request).then(function(cached) {
-        if (cached) return cached;
-        return fetch(e.request).then(function(r) {
-          if (r && r.status === 200) {
-            var clone = r.clone();
-            caches.open(CACHE_NAME).then(function(c) { c.put(e.request, clone); });
-          }
-          return r;
-        }).catch(function() { return cached; });
-      })
-    );
-    return;
-  }
-
-  // Resto: network, fallback cache
-  e.respondWith(
-    fetch(e.request, { cache: 'no-store' }).catch(function() {
-      return caches.match(e.request);
-    })
-  );
-});
-
-self.addEventListener('message', function(e) {
-  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+  e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request).then(r => { if(r && r.ok){ const c=r.clone(); caches.open(CACHE_NAME).then(x=>x.put(e.request,c)); } return r; })));
 });

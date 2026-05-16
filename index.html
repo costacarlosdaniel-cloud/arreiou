@@ -1,253 +1,65 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-<meta name="theme-color" content="#0070F3">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="robots" content="noindex,nofollow,noarchive">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Karta">
-<meta name="app-version" content="20260516001">
-<title>Karta · Retail Intelligence</title>
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230A0A0F'/%3E%3Crect x='7' y='7' width='7.5' height='7.5' rx='1.5' fill='white'/%3E%3Crect x='17' y='7' width='7.5' height='7.5' rx='1.5' fill='%230070F3' opacity='.7'/%3E%3Crect x='7' y='17' width='7.5' height='7.5' rx='1.5' fill='%230070F3'/%3E%3Crect x='17' y='17' width='7.5' height='7.5' rx='1.5' fill='white'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/styles.css">
-<!-- PapaParse para CSV robusto -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0070F3" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Karta · Retail Intelligence</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="./icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
+  <header class="hdr">
+    <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+    <div class="brand">Karta</div>
+    <div class="divider"></div>
+    <div class="subtitle">Retail Intelligence</div>
+    <div class="spacer"></div>
+    <button id="btnSync" class="btn primary">Atualizar Sheet</button>
+    <span id="syncState" class="state"></span>
+  </header>
 
-<!-- ── HEADER ──────────────────────────────────────────────────── -->
-<header class="hdr">
-  <div class="bm">
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <rect x="1" y="1" width="6.5" height="6.5" rx="1.5" fill="white"/>
-      <rect x="8.5" y="1" width="6.5" height="6.5" rx="1.5" fill="#0070F3" opacity=".65"/>
-      <rect x="1" y="8.5" width="6.5" height="6.5" rx="1.5" fill="#0070F3"/>
-      <rect x="8.5" y="8.5" width="6.5" height="6.5" rx="1.5" fill="white"/>
-    </svg>
-  </div>
-  <span class="bn">Karta</span>
-  <div class="hs"></div>
-  <div class="hr">
-    <span class="hdate" id="hdate"></span>
-    <span id="upst" class="upst"></span>
-    <button class="btn-hoje" id="btn-hoje" style="display:none">
-      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>
-      <span>Hoje</span>
-    </button>
-    <button class="btn-up" id="btn-sync">
-      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-      <span>Sync</span>
-    </button>
-    <label class="btn-up" style="cursor:pointer" onclick="APP._checkPin()">
-      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      <span>Excel</span>
-    </label>
-    <input type="file" id="fin" accept=".xlsx,.xls" style="display:none">
-    <button id="btn-install">
-      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Instalar
-    </button>
-  </div>
-</header>
+  <main class="app-shell">
+    <aside class="side">
+      <input id="storeSearch" class="search" placeholder="Pesquisar loja..." />
+      <nav id="storeList" class="store-list"></nav>
+    </aside>
 
-<!-- ── TOP NAV ──────────────────────────────────────────────────── -->
-<nav class="tnav">
-  <div class="tb on" data-view="kpi"><div class="tdot" style="background:#0070F3"></div>KPI Diário</div>
-  <div class="tb" data-view="analises"><div class="tdot" style="background:#7C3AED"></div>Análises</div>
-  <div class="tb" data-view="contagens"><div class="tdot" style="background:#00875A"></div>Contagens</div>
-  <div class="tb" data-view="sup"><div class="tdot" style="background:#C47B00"></div>Roteiro</div>
-  <div class="tb" data-view="adm"><div class="tdot" style="background:#52525E"></div>Admin</div>
-</nav>
+    <section class="workspace">
+      <nav class="tabs" id="tabs">
+        <button data-view="kpi" class="active">KPI</button>
+        <button data-view="analises">Análises</button>
+        <button data-view="contagens">Contagens</button>
+        <button data-view="escalas">Escalas</button>
+        <button data-view="supervisores">Roteiro</button>
+        <button data-view="admin">Admin</button>
+      </nav>
 
-<!-- ── KPI SHELL ─────────────────────────────────────────────────── -->
-<div class="shell on" id="sh-kpi">
-  <!-- Sidebar -->
-  <aside class="sb" id="sidebar">
-    <div class="sbs">
-      <div class="sbwr">
-        <svg class="sbic" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="sb-search" placeholder="Pesquisar loja…">
-      </div>
-    </div>
-    <div class="sbn" id="sbn">
-      <div class="empty" style="min-height:120px">
-        <div class="loading-spin"></div>
-        <p>A carregar lojas…</p>
-      </div>
-    </div>
-    <div class="sb-footer">
-      <button id="btn-install" style="display:none">
-        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Instalar App
-      </button>
-      <span id="fb-sync-status" class="upst" style="font-size:11px;text-align:center"></span>
-    </div>
-  </aside>
-  <div id="sb-overlay"></div>
-  <!-- Main KPI -->
-  <main class="km" id="km">
-    <div class="empty">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".12"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-      <h3>Selecione uma loja</h3>
-      <p>Escolha uma loja na barra lateral para ver os KPIs diários</p>
-    </div>
+      <section id="view-kpi" class="view active"></section>
+      <section id="view-analises" class="view"></section>
+      <section id="view-contagens" class="view"></section>
+      <section id="view-escalas" class="view"></section>
+      <section id="view-supervisores" class="view"></section>
+      <section id="view-admin" class="view"></section>
+    </section>
   </main>
-</div>
 
-<!-- ── ANÁLISES SHELL ────────────────────────────────────────────── -->
-<div class="shell" id="sh-analises">
-  <div class="stabs">
-    <div class="stab on" data-sub="topflop"><div class="tabdot" style="background:#e63946"></div>Top / Flop</div>
-    <div class="stab" data-sub="pao"><div class="tabdot" style="background:#d4a800"></div>Pão</div>
-    <div class="stab" data-sub="sales"><div class="tabdot" style="background:#0070F3"></div>Sales Ratio</div>
-  </div>
-  <div class="ascroll">
-    <div class="asec on" id="as-topflop">
-      <div class="sechdr" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
-        <div><h2>Top 5 &amp; Flop 5 por KPI</h2><p>Ranking por indicador · todas as lojas</p></div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <label style="font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">Dia</label>
-          <input type="date" id="tf-date" onchange="APP._renderTopFlopBound&&APP._renderTopFlopBound()" style="background:var(--w);border:1px solid var(--bd);border-radius:5px;font-family:inherit;font-size:12px;color:var(--tx);padding:5px 9px;outline:none">
-          <button class="btn-up" onclick="document.getElementById('tf-date').value=APP.TODAY;APP._renderTopFlopBound&&APP._renderTopFlopBound()">Hoje</button>
-        </div>
-      </div>
-      <div id="tf-content" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px"></div>
-    </div>
-    <div class="asec" id="as-pao">
-      <div class="sechdr"><h2>Pão</h2><p>Venda média diária e horários</p></div>
-    </div>
-    <div class="asec" id="as-sales">
-      <div class="sechdr"><h2>Sales Ratio</h2><p>Vendas por SKU e categoria</p></div>
-    </div>
-  </div>
-</div>
+  <nav class="bottom-nav" id="bottomNav">
+    <button data-view="kpi" class="active">KPI</button>
+    <button data-view="analises">Análises</button>
+    <button data-view="contagens">Contagens</button>
+    <button data-view="escalas">Escalas</button>
+    <button data-view="admin">Admin</button>
+  </nav>
 
-<!-- ── CONTAGENS SHELL ───────────────────────────────────────────── -->
-<div class="shell" id="sh-contagens">
-  <main class="km">
-    <div class="empty"><div class="loading-spin"></div><p>A carregar contagens…</p></div>
-  </main>
-</div>
-
-<!-- ── ROTEIRO SHELL ─────────────────────────────────────────────── -->
-<div class="shell" id="sh-sup">
-  <main class="km">
-    <div class="empty"><div class="loading-spin"></div><p>A carregar roteiro…</p></div>
-  </main>
-</div>
-
-<!-- ── ADMIN SHELL ───────────────────────────────────────────────── -->
-<div class="shell" id="sh-adm">
-  <main class="km">
-    <div class="empty"><div class="loading-spin"></div><p>A carregar…</p></div>
-  </main>
-</div>
-
-<!-- ── MOBILE NAV ────────────────────────────────────────────────── -->
-<nav id="mobile-nav" style="display:none">
-  <button class="mnb on" data-bottom="kpi">
-    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-    KPIs
-  </button>
-  <button class="mnb" data-bottom="analises">
-    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-    Análises
-  </button>
-  <button class="mnb" data-bottom="contagens">
-    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/></svg>
-    Contagens
-  </button>
-  <button class="mnb" data-bottom="sup">
-    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
-    Roteiro
-  </button>
-  <button class="mnb" data-bottom="adm">
-    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0112 0v2"/></svg>
-    Admin
-  </button>
-</nav>
-
-<!-- ── MODAL CONTAGEM ────────────────────────────────────────────── -->
-<div class="modal-overlay" id="modal-contagem" style="display:none">
-  <div class="modal-box">
-    <div class="modal-hdr">
-      <h3>Nova Contagem</h3>
-      <button class="btn-up" style="padding:4px 8px;font-size:11px" onclick="Modal.close('modal-contagem')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="fgrid">
-        <div><label>Data</label><input type="date" id="nc-dt"></div>
-        <div><label>Turno</label><select id="nc-turno"><option>Manhã</option><option>Tarde</option><option>Noite</option></select></div>
-        <div><label>Loja</label><input type="text" id="nc-loja" placeholder="Ex: A082"></div>
-        <div><label>Responsável</label><input type="text" id="nc-resp" placeholder="Nome"></div>
-        <div><label>Secção</label><input type="text" id="nc-sec" placeholder="Ex: Padaria"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;grid-column:1/-1">
-          <div><label>Contado</label><input type="number" id="nc-cont" placeholder="0"></div>
-          <div><label>Sistema</label><input type="number" id="nc-sis" placeholder="0"></div>
-        </div>
-        <div class="full"><label>Notas</label><textarea id="nc-notas" placeholder="Justificação da diferença…"></textarea></div>
-      </div>
-    </div>
-    <div class="modal-ftr">
-      <button class="btn-up" onclick="Modal.close('modal-contagem')">Cancelar</button>
-      <button class="bsave" onclick="APP._saveContagem()">Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── OVERLAYS GLOBAIS ──────────────────────────────────────────── -->
-<div id="toast-container"></div>
-<div id="loading-overlay"><div class="loading-inner"><div class="loading-spin lg"></div><p id="loading-msg">A processar…</p></div></div>
-
-<!-- ── HEADER DATE ───────────────────────────────────────────────── -->
-<script>
-(function() {
-  var d = new Date();
-  var el = document.getElementById('hdate');
-  if (el) el.textContent = d.toLocaleDateString('pt-PT', { weekday:'short', day:'numeric', month:'short' });
-  // Mobile sidebar toggle (inline para funcionar antes do app.js carregar)
-  var sbBtn = document.createElement('button');
-  sbBtn.className = 'btn-up';
-  sbBtn.style.cssText = 'padding:7px 9px;display:none';
-  sbBtn.id = 'sb-toggle';
-  sbBtn.innerHTML = '<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>';
-  var hdr = document.querySelector('.hdr');
-  if (hdr) hdr.insertBefore(sbBtn, hdr.firstChild);
-  // Show mobile elements on resize
-  function checkMobile() {
-    var m = window.innerWidth <= 768;
-    sbBtn.style.display = m ? 'flex' : 'none';
-    var mn = document.getElementById('mobile-nav');
-    if (mn) mn.style.display = m ? 'flex' : 'none';
-    var tnav = document.querySelector('.tnav');
-    if (tnav) tnav.style.display = m ? 'none' : '';
-  }
-  checkMobile();
-  window.addEventListener('resize', checkMobile);
-  // Excel PIN stub (substituído pelo app.js)
-  window.APP = window.APP || {};
-  window.APP._checkPin = function() {
-    var fin = document.getElementById('fin'); if (fin) fin.click();
-  };
-})();
-</script>
-
-<!-- ── APP ───────────────────────────────────────────────────────── -->
-<script type="module" src="/app.js"></script>
-
-<!-- Expor Modal globalmente para onclick inline -->
-<script type="module">
-  import { Modal } from '/ui.js';
-  window.Modal = Modal;
-</script>
-
+  <div id="toast" class="toast"></div>
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
