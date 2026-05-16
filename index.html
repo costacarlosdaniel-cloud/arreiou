@@ -29,7 +29,7 @@
     <div class="status" id="app-status">A iniciar…</div>
   </header>
 
-  <aside class="sidebar">
+  <aside class="sidebar" aria-label="Menu principal">
     <button class="nav-item active" data-view="dashboard">Dashboard</button>
     <button class="nav-item" data-view="stores">Lojas</button>
     <button class="nav-item" data-view="kpis">KPIs</button>
@@ -37,65 +37,11 @@
     <button class="nav-item" data-view="settings">Sistema</button>
   </aside>
 
-  <main class="main">
-    <section class="view active" id="view-dashboard">
-      <div class="page-head">
-        <h1>Dashboard</h1>
-        <p>Base modular ligada ao Firebase novo.</p>
-      </div>
-      <div class="cards">
-        <article class="card">
-          <span class="label">Estado Firebase</span>
-          <strong id="firebase-state">A validar…</strong>
-        </article>
-        <article class="card">
-          <span class="label">Lojas carregadas</span>
-          <strong id="store-count">0</strong>
-        </article>
-        <article class="card">
-          <span class="label">Utilizador</span>
-          <strong id="user-state">—</strong>
-        </article>
-      </div>
-    </section>
-
-    <section class="view" id="view-stores">
-      <div class="page-head row">
-        <div>
-          <h1>Lojas</h1>
-          <p>Lidas da coleção <code>stores</code>.</p>
-        </div>
-        <button class="primary" id="refresh-stores">Atualizar</button>
-      </div>
-      <div class="panel">
-        <table>
-          <thead>
-            <tr><th>Código</th><th>Nome</th><th>Supervisor</th><th>Gerente</th><th>Ativa</th></tr>
-          </thead>
-          <tbody id="stores-table">
-            <tr><td colspan="5">A carregar lojas…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="view" id="view-kpis">
-      <div class="page-head"><h1>KPIs</h1><p>Módulo reservado para migração.</p></div>
-      <div class="empty">Próximo módulo a implementar.</div>
-    </section>
-
-    <section class="view" id="view-inventory">
-      <div class="page-head"><h1>Contagens</h1><p>Módulo reservado para inventários.</p></div>
-      <div class="empty">Próximo módulo a implementar.</div>
-    </section>
-
-    <section class="view" id="view-settings">
-      <div class="page-head"><h1>Sistema</h1><p>Diagnóstico da app.</p></div>
-      <div class="panel diagnostics" id="diagnostics"></div>
-    </section>
+  <main class="main" id="dynamic-content" tabindex="-1">
+    <div class="empty">A carregar módulo…</div>
   </main>
 
-  <nav class="mobile-nav">
+  <nav class="mobile-nav" aria-label="Menu mobile">
     <button class="active" data-view="dashboard">Início</button>
     <button data-view="stores">Lojas</button>
     <button data-view="kpis">KPIs</button>
