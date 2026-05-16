@@ -1,27 +1,26 @@
 {
   "name": "Karta · Retail Intelligence",
   "short_name": "Karta",
-  "description": "Gestão operacional de supermercados hard discount",
+  "description": "Retail Intelligence — KPIs, análises e operações em tempo real",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0A0A0A",
+  "background_color": "#0A0A0F",
   "theme_color": "#0070F3",
   "orientation": "any",
   "icons": [
     {
-      "src": "icons/icon-192.png",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
   ],
   "categories": ["business", "productivity"],
-  "lang": "pt",
-  "dir": "ltr"
+  "lang": "pt"
 }

@@ -1,1146 +1,641 @@
 /* ============================================================
    Karta · Retail Intelligence — App Module
-   ============================================================
-   - Routing entre módulos
-   - Estado global da aplicação
-   - Lógica de negócio
-   - Integração Firebase + UI
    ============================================================ */
 
-import { initFirebase, StoresDB, KPIsDB, TargetsDB, InventoryDB, ReviewsDB, SchedulesDB, StorageDB, Cache, seedDemoData } from './firebase.js';
-import { Fmt, Toast, Loading, Modal, buildKPICard, buildSparkline, buildProgressBar, buildTable, debounce, exportToCSV, filterTable, setupInstallPrompt } from './ui.js';
+import { initFirebase, AppData, AdminCfg, writeEntry, loadEntriesForStoreYear, startEntriesLive, Schedules, SupReviews, InventoryCounts, Cache, backupExport, LOW_COST, COL } from './firebase.js';
+import { gsSyncAll, gsSyncLoja, SALES_DATA, PAO_DATA, PAO_POTENCIAL, LOJA_SUPERVISORES, pd, numAny, dtmStr, upsRow, normCentro, fi, loadSalesRatio } from './sheets.js';
+import { Fmt, Toast, Loading, Modal, aCard, bRow, bdg, rutBdg, dlBdg, dpBdg, filterTable, exportCSV, debounce, setupInstallPrompt, setupUpdateBanner, setupOfflineBanner } from './ui.js';
 
 /* ============================================================
    ESTADO GLOBAL
    ============================================================ */
-const State = {
-  currentModule: 'dashboard',
-  selectedStore: null,
-  stores: [],
-  currentYear: new Date().getFullYear(),
-  currentMonth: new Date().getMonth() + 1,
-  user: null,
-  offline: !navigator.onLine,
+const APP = {
+  view:     'kpi',       // módulo activo
+  AS:       null,        // loja seleccionada
+  AY:       new Date().getFullYear(),
+  ED:       _isoToday(),
+  TODAY:    _isoToday(),
+  CYR:      new Date().getFullYear(),
+  ADMCFG:   { lojas: [] },
+  DB:       {},          // DB[centro] = { n, r: [{d, vs, ru, cl, tk, vp, h1, hu, hl, hp}] }
+  entries:  {},          // entries['{loja}_{date}'] = {venda_dia, tpas, padeiros, obs, ...}
+  FORM_DATA: {},         // SM form data
+  SUP_DATA:  {},         // roteiro supervisor
+  GERENTE_DATA: {},
+  _supTabs: ['top','pao','quebras','downtime','sales','cobertura'],
 };
+window.APP = APP; // acesso global para callbacks inline
+
+function _isoToday(offset=0) {
+  const d = new Date(); d.setDate(d.getDate()+offset);
+  return d.toISOString().split('T')[0];
+}
+function _allDays(yr) {
+  const a = [], d = new Date(yr,0,1);
+  while (d.getFullYear() === yr) { a.push(d.toISOString().split('T')[0]); d.setDate(d.getDate()+1); }
+  return a;
+}
+const WD = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+/* ── helpers de leitura de entries ───────────────────────────── */
+function gE(c, dt)          { return APP.entries[c+'_'+dt] || {}; }
+function gS(c, dt)          { return (APP.DB[c]?.r?.find(r => r.d === dt)) || null; }
+function sE(c, dt, f, v) {
+  const k = c+'_'+dt;
+  if (!APP.entries[k]) APP.entries[k] = {};
+  if (v===''||v===null||v===undefined) delete APP.entries[k][f]; else APP.entries[k][f] = v;
+  try { localStorage.setItem('arrv6', JSON.stringify(APP.entries)); } catch(e) {}
+  writeEntry(k, APP.entries[k] || null);
+}
 
 /* ============================================================
-   INICIALIZAÇÃO
+   INIT
    ============================================================ */
 async function init() {
   // Service Worker
   if ('serviceWorker' in navigator) {
-    try {
-      const reg = await navigator.serviceWorker.register('/sw.js');
-      reg.addEventListener('updatefound', () => {
-        const newSW = reg.installing;
-        newSW.addEventListener('statechange', () => {
-          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-            showUpdateBanner();
-          }
-        });
-      });
-    } catch (e) {
-      console.warn('[SW] Falha no registo:', e);
-    }
+    navigator.serviceWorker.register('/sw.js').catch(e => console.warn('[SW]', e));
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data?.type === 'NEW_VERSION') setupUpdateBanner();
+    });
   }
 
   // Firebase
-  const firebaseOk = initFirebase();
-  if (!firebaseOk) {
-    Toast.error('Erro ao ligar ao Firebase. A usar dados demo.');
-  }
+  const fbOk = initFirebase();
+  if (!fbOk) Toast.warning('Firebase não ligado — modo offline');
 
-  // Online/offline
-  window.addEventListener('online', () => {
-    State.offline = false;
-    document.getElementById('offline-banner')?.remove();
-    Toast.success('Ligação restabelecida');
-  });
-  window.addEventListener('offline', () => {
-    State.offline = true;
-    showOfflineBanner();
-    Toast.warning('Sem ligação à internet');
-  });
-  if (!navigator.onLine) showOfflineBanner();
-
-  // Install prompt
+  // PWA
   setupInstallPrompt();
+  setupOfflineBanner();
 
-  // Carregar lojas
-  await loadStores();
+  // entries do localStorage
+  try { APP.entries = JSON.parse(localStorage.getItem('arrv6') || '{}'); } catch(e) { APP.entries = {}; }
 
-  // Routing
-  setupNavigation();
-  navigateTo(State.currentModule);
+  // Carregar configuração admin
+  await _loadAdmCfg();
 
-  // Sidebar toggle mobile
-  setupSidebar();
+  // Navegação
+  _setupNav();
+  _switchView('kpi');
+
+  // Firebase listeners (low cost)
+  startEntriesLive(() => { if (APP.AS) try { renderTable(); } catch(e) {} });
+
+  // Sync Google Sheets em background
+  _syncSheets();
+
+  // Dados adicionais async
+  _loadAppData();
 }
 
 /* ============================================================
-   NAVEGAÇÃO
+   ADMCFG — lojas
    ============================================================ */
-function setupNavigation() {
-  // Sidebar links
-  document.querySelectorAll('[data-module]').forEach(el => {
-    el.addEventListener('click', (e) => {
-      e.preventDefault();
-      const module = el.dataset.module;
-      navigateTo(module);
-      // Fechar sidebar mobile
-      document.getElementById('sidebar')?.classList.remove('sidebar-open');
-    });
-  });
+async function _loadAdmCfg() {
+  let cfg = null;
+  try {
+    cfg = await AdminCfg.load();
+  } catch(e) { console.warn('[App] admcfg error:', e); }
 
+  // Fallback: localStorage
+  if (!cfg) {
+    try { cfg = JSON.parse(localStorage.getItem('arreiou_adm_obj_v1') || 'null'); } catch(e) {}
+  }
+
+  if (cfg?.lojas?.length) {
+    APP.ADMCFG = cfg;
+    _buildDB(cfg.lojas);
+    _buildSidebar(cfg.lojas);
+    // Atualizar entries em localStorage com dados frescos do Firebase
+    if (APP.AS) await loadEntriesForStoreYear(APP.AS, APP.AY).then(fresh => { Object.assign(APP.entries, fresh); }).catch(() => {});
+  }
+}
+
+function _buildDB(lojas) {
+  lojas.forEach(l => {
+    if (!l?.c) return;
+    if (!APP.DB[l.c]) APP.DB[l.c] = { n: l.n||l.c, s: l.s||'', r: [] };
+    else { APP.DB[l.c].n = l.n||l.c; APP.DB[l.c].s = l.s||''; }
+  });
+}
+
+function _buildSidebar(lojas) {
+  const ul = document.getElementById('sbn'); if (!ul) return;
+  const today = APP.TODAY, mes = today.substring(0,7);
+  ul.innerHTML = lojas.filter(l => _isLojaActiva(l.c, mes)).map(l => `
+    <div class="nav-item" id="nav-${l.c}" onclick="APP._navLoja('${l.c}')">
+      <span class="nav-code">${l.c}</span>
+      <span class="nav-name">${l.n||l.c}</span>
+    </div>`).join('');
+}
+
+function _isLojaActiva(c, mes) {
+  const l = APP.ADMCFG.lojas.find(x => x.c === c);
+  if (!l) return true;
+  if (l.inactiva) return false;
+  if (l.fecho && l.fecho < mes) return false;
+  return true;
+}
+
+APP._navLoja = function(c) {
+  APP.loadStore(c);
+  // fechar sidebar mobile
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sb-overlay')?.classList.remove('active');
+};
+
+/* ============================================================
+   LOAD STORE
+   ============================================================ */
+APP.loadStore = async function(c) {
+  APP.AS = c; APP.ED = APP.TODAY; APP.AY = APP.CYR;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('on', el.id === 'nav-'+c));
+  document.getElementById('btn-hoje')?.style?.setProperty('display','flex');
+  _switchView('kpi', { skipRender: true });
+  renderPage();
+  // Carregar entries do Firebase para esta loja/ano
+  try {
+    const fresh = await loadEntriesForStoreYear(c, APP.AY);
+    Object.assign(APP.entries, fresh);
+    renderTable();
+  } catch(e) {}
+  // Sync SAP
+  setTimeout(() => gsSyncLoja(APP.DB, c, msg => _gsStatus(msg)).then(() => { if(APP.AS===c) renderTable(); }).catch(() => {}), 300);
+};
+
+/* ============================================================
+   NAVEGAÇÃO ENTRE MÓDULOS
+   ============================================================ */
+function _setupNav() {
+  // Top nav tabs
+  document.querySelectorAll('[data-view]').forEach(el => {
+    el.addEventListener('click', () => _switchView(el.dataset.view));
+  });
   // Bottom nav mobile
-  document.querySelectorAll('[data-bottom-nav]').forEach(el => {
-    el.addEventListener('click', () => {
-      navigateTo(el.dataset.bottomNav);
-    });
+  document.querySelectorAll('[data-bottom]').forEach(el => {
+    el.addEventListener('click', () => _switchView(el.dataset.bottom));
   });
+  // Sub-tabs analises
+  document.querySelectorAll('[data-sub]').forEach(el => {
+    el.addEventListener('click', () => _switchSub(el.dataset.sub));
+  });
+  // Sidebar search
+  const sbSearch = document.getElementById('sb-search');
+  if (sbSearch) sbSearch.addEventListener('input', debounce(e => _filterSidebar(e.target.value), 200));
+  // Sidebar mobile toggle
+  const sbToggle = document.getElementById('sb-toggle');
+  const sbOv     = document.getElementById('sb-overlay');
+  sbToggle?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.toggle('open'); sbOv?.classList.toggle('active'); });
+  sbOv?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); sbOv?.classList.remove('active'); });
+  // Hoje
+  document.getElementById('btn-hoje')?.addEventListener('click', () => { if(!APP.AS){return;} if(APP.AY!==APP.CYR){APP.AY=APP.CYR;} APP.ED=APP.TODAY; loadForm(APP.TODAY); scrollToToday(); });
+  // Sync btn
+  document.getElementById('btn-sync')?.addEventListener('click', () => _syncSheets());
+  // Upload Excel
+  document.getElementById('fin')?.addEventListener('change', e => handleUpload(e.target));
 }
 
-function navigateTo(module) {
-  State.currentModule = module;
-
-  // Update active state nav
-  document.querySelectorAll('[data-module]').forEach(el => {
-    el.classList.toggle('nav-active', el.dataset.module === module);
-  });
-  document.querySelectorAll('[data-bottom-nav]').forEach(el => {
-    el.classList.toggle('bottom-nav-active', el.dataset.bottom_nav === module || el.dataset.bottomNav === module);
-  });
-
-  // Update page title
-  const titles = {
-    dashboard: 'Dashboard',
-    analytics: 'Análises',
-    inventory: 'Contagens',
-    schedules: 'Escalas',
-    reviews: 'Roteiro',
-    admin: 'Administração',
-  };
-  document.getElementById('page-title').textContent = titles[module] || module;
-
-  // Render module
-  renderModule(module);
+function _switchView(v, opts={}) {
+  APP.view = v;
+  document.querySelectorAll('[data-view]').forEach(el => el.classList.toggle('on', el.dataset.view === v));
+  document.querySelectorAll('[data-bottom]').forEach(el => el.classList.toggle('on', el.dataset.bottom === v));
+  document.querySelectorAll('.shell').forEach(el => el.classList.remove('on'));
+  const sh = document.getElementById('sh-'+v);
+  if (sh) sh.classList.add('on');
+  if (!opts.skipRender) _renderView(v);
 }
 
-async function renderModule(module) {
-  const main = document.getElementById('main-content');
-  Loading.show(main);
+function _renderView(v) {
+  const main = document.getElementById('km');
+  if (v === 'kpi')        { if (APP.AS) renderPage(); else _renderStorePrompt(); }
+  else if (v === 'analises') { _renderAnalises(); }
+  else if (v === 'contagens') { _renderContagens(); }
+  else if (v === 'sup')      { _renderRoteiro(); }
+  else if (v === 'adm')      { _renderAdmin(); }
+}
 
-  try {
-    switch (module) {
-      case 'dashboard': await renderDashboard(main); break;
-      case 'analytics': await renderAnalytics(main); break;
-      case 'inventory': await renderInventory(main); break;
-      case 'schedules': await renderSchedules(main); break;
-      case 'reviews': await renderReviews(main); break;
-      case 'admin': await renderAdmin(main); break;
-      default: main.innerHTML = `<div class="empty-state"><p>Módulo não encontrado</p></div>`;
+function _renderStorePrompt() {
+  const km = document.getElementById('km');
+  if (!km) return;
+  km.innerHTML = `<div class="empty"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--t4)" stroke-width="1.2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><h3>Selecione uma loja</h3><p>Escolha uma loja na barra lateral para ver os KPIs</p></div>`;
+}
+
+function _switchSub(sub) {
+  document.querySelectorAll('[data-sub]').forEach(el => el.classList.toggle('on', el.dataset.sub === sub));
+  document.querySelectorAll('.asec').forEach(el => el.classList.remove('on'));
+  document.getElementById('as-'+sub)?.classList.add('on');
+  _renderSubView(sub);
+}
+
+/* ============================================================
+   KPI PAGE (renderPage + renderTable)
+   ============================================================ */
+function renderPage() {
+  const st = APP.DB[APP.AS]; if (!st) return;
+  const yrs = new Set([String(APP.CYR), String(APP.CYR-1)]);
+  (st.r||[]).forEach(r => { if(r.d) yrs.add(r.d.slice(0,4)); });
+  const yo = [...yrs].sort((a,b)=>b-a).map(y => `<option value="${y}"${+y===APP.AY?' selected':''}>${y}</option>`).join('');
+  const km = document.getElementById('km'); if (!km) return;
+  km.innerHTML = `
+<div class="pghdr">
+  <div class="pgtit">
+    <h2><span class="ctag">${APP.AS}</span>${st.n}</h2>
+    <div class="pgsub" id="gerente-hdr"></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;margin-left:auto">
+    <span id="fb-sync-status" class="upst"></span>
+    <select class="yrsel" id="yrsel" onchange="APP._changeYear(this.value)">${yo}</select>
+  </div>
+</div>
+<div class="ecard" id="ecard">
+  <div class="clbl">Registo manual</div>
+  <div class="edr">
+    <span class="edlbl">Data</span>
+    <input type="date" id="edt" max="${APP.TODAY}" onchange="APP._onDC(this.value)">
+    <span class="ednote" id="enote"></span>
+  </div>
+  <div class="frow">
+    <div class="fld"><label>Venda do dia (AOA)</label><div class="iw"><input type="number" id="iv" placeholder="0" step="1000" oninput="APP._onVendaInput(this)"><span class="iwsuf">AOA</span></div></div>
+    <div class="fld"><label>TPAs a funcionar</label><input type="number" id="it" placeholder="0" min="0"></div>
+    <div class="fld"><label>Qt. Padeiros</label><input type="number" id="ip" placeholder="0" min="0"></div>
+    <div class="fld"><label>Observações</label><input type="text" id="io" placeholder="Nota livre..."></div>
+    <div class="fa"><div class="fasp">·</div><button class="bsave" onclick="APP._doSave()">Guardar</button></div>
+  </div>
+  <div class="smsg" id="smsg">✓ Guardado</div>
+</div>
+<div class="ktcard">
+  <div class="ktbar"><span class="ktbtit" id="kttit">Todos os dias de ${APP.AY}</span></div>
+  <div class="ktwrap" id="ktwrap">
+    <table class="kt"><thead><tr>
+      <th style="text-align:left">Data</th>
+      <th class="mc ksep">Venda Dia</th><th class="mc">TPAs</th><th class="mc">Padeiros</th><th class="mc">Obs.</th>
+      <th class="ksep">Venda SAP</th><th>Rutura</th><th>Clientes</th>
+      <th>Venda Pão</th><th>1º Pão</th><th>Últ. Pão</th><th>Ticket</th>
+      <th>DT Loja</th><th>DT Padaria</th><th>Aval.SM</th><th>Rot.Sup</th>
+    </tr></thead>
+    <tbody id="ktbody"></tbody></table>
+  </div>
+</div>`;
+  loadForm(APP.TODAY);
+  renderTable();
+  setTimeout(scrollToToday, 120);
+  _updateGerenteHdr();
+}
+
+function renderTable() {
+  const tb = document.getElementById('ktbody'); if (!tb) return;
+  let h = '';
+  _allDays(APP.AY).slice().reverse().forEach(dt => {
+    const sap = gS(APP.AS, dt), ue = gE(APP.AS, dt);
+    const iT = dt === APP.TODAY, iF = dt > APP.TODAY;
+    const vd = ue.venda_dia ?? null, tp = ue.tpas ?? null, pa = ue.padeiros ?? null, ob = ue.obs || null;
+    const rc  = sap?.ru  != null ? (sap.ru > 1.5 ? 'vb' : 'vg') : 've';
+    const dlc = sap?.hl  != null ? (sap.hl > 0   ? 'vb' : 'vg') : 've';
+    const dpc = sap?.hp  != null ? (sap.hp > 0   ? 'vw' : 'vg') : 've';
+    const h1Min = sap?.h1 ? ((p=sap.h1.split(':'))=>+p[0]*60+(+p[1]||0))() : null;
+    const huMin = sap?.hu ? ((p=sap.hu.split(':'))=>+p[0]*60+(+p[1]||0))() : null;
+    const h1Sty = h1Min != null && h1Min > 485 ? 'color:var(--red);font-weight:600' : '';
+    const huSty = huMin != null && huMin < 1260 ? 'color:var(--red);font-weight:600' : '';
+    // SM
+    const mes = dt.slice(0,7);
+    const smDay = ((APP.FORM_DATA[mes]||{})[APP.AS]||{})[dt] || null;
+    const smVal = smDay ? parseFloat(smDay.avsm) : NaN;
+    const smCol = !isNaN(smVal) ? (smVal>=7?'var(--green)':smVal>=5?'var(--amber)':'var(--red)') : '';
+    const smCell = !isNaN(smVal) ? `<td style="text-align:center;font-weight:600;color:${smCol}">${smVal.toFixed(1)}</td>` : '<td class="ve">—</td>';
+    // Sup
+    const supName = (LOJA_SUPERVISORES[APP.AS]?.sup) || (APP.ADMCFG.lojas.find(l=>l.c===APP.AS)||{}).s || '';
+    const supDay  = ((APP.SUP_DATA[mes]||{})[supName]||{})[dt] || null;
+    const supVal  = supDay ? parseFloat(supDay.__final__) : NaN;
+    const supCol  = !isNaN(supVal) ? (supVal>=7?'var(--green)':supVal>=5?'var(--amber)':'var(--red)') : '';
+    const supCell = !isNaN(supVal) ? `<td style="text-align:center;font-weight:600;color:${supCol}">${supVal.toFixed(1)}</td>` : '<td class="ve">—</td>';
+
+    h += `<tr class="${iT?'tod':iF?'fut':''}" id="row-${dt}"${!iF?` onclick="APP._selRow('${dt}')"`:''}>`
+      + `<td><div class="dc">${iT?'<span class="tbdg">Hoje</span>':''}<span class="dc-d">${dt}</span><span class="dc-w">${WD[new Date(dt+'T12:00:00').getDay()]}</span></div></td>`
+      + `<td class="${vd!=null?'vm':'ve'} ksep">${vd!=null?Fmt.n(vd):'—'}</td>`
+      + `<td class="${tp!=null?'vm':'ve'}">${tp!=null?tp:'—'}</td>`
+      + `<td class="${pa!=null?'vm':'ve'}">${pa!=null?pa:'—'}</td>`
+      + `<td class="${ob?'vm':'ve'}" title="${(ob||'').replace(/"/g,'&quot;')}" style="max-width:120px;overflow:hidden;text-overflow:ellipsis">${ob||'—'}</td>`
+      + `<td class="${sap?.vs!=null?'va':'ve'} ksep">${sap?Fmt.n(sap.vs):'—'}</td>`
+      + `<td class="${rc}">${sap&&sap.ru!=null?sap.ru.toFixed(2)+'%':'—'}</td>`
+      + `<td class="${sap?.cl!=null?'va':'ve'}">${sap?Fmt.n(sap.cl):'—'}</td>`
+      + `<td class="${sap?.vp!=null?'va':'ve'}">${sap?Fmt.n(sap.vp):'—'}</td>`
+      + `<td class="${sap?.h1?'va':'ve'}" style="${h1Sty}">${sap?.h1||'—'}</td>`
+      + `<td class="${sap?.hu?'va':'ve'}" style="${huSty}">${sap?.hu||'—'}</td>`
+      + `<td class="${sap?.tk!=null?'va':'ve'}">${sap?Fmt.n(sap.tk):'—'}</td>`
+      + `<td class="${dlc}">${sap?.hl!=null?(+sap.hl).toFixed(1)+'h':'—'}</td>`
+      + `<td class="${dpc}">${sap?.hp!=null?(+sap.hp).toFixed(1)+'h':'—'}</td>`
+      + smCell + supCell
+      + '</tr>';
+  });
+  tb.innerHTML = h;
+}
+
+/* ── form helpers ──────────────────────────────────────────────── */
+function loadForm(dt) {
+  APP.ED = dt;
+  const e = gE(APP.AS, dt);
+  const di = document.getElementById('edt'); if (di) di.value = dt;
+  const no = document.getElementById('enote'); if (no) no.textContent = dt===APP.TODAY?'Hoje':'Data anterior';
+  [['iv','venda_dia'],['it','tpas'],['ip','padeiros'],['io','obs']].forEach(([id,k]) => {
+    const el = document.getElementById(id); if (el) el.value = e[k] != null ? e[k] : '';
+  });
+  APP._onVendaInput(document.getElementById('iv'));
+}
+
+APP._onDC = v => { if (v > APP.TODAY) { document.getElementById('edt').value=APP.TODAY; return; } loadForm(v); _updateGerenteHdr(v); };
+APP._selRow = dt => { loadForm(dt); _updateGerenteHdr(dt); document.getElementById('ecard')?.scrollIntoView({behavior:'smooth',block:'nearest'}); };
+APP._onVendaInput = el => {
+  const has = el?.value !== '';
+  ['lbl-req-t','lbl-req-p'].forEach(id => { const x=document.getElementById(id); if(x) x.style.display=has?'inline':'none'; });
+};
+APP._changeYear = yr => {
+  APP.AY = +yr;
+  const tt = document.getElementById('kttit'); if(tt) tt.textContent='Todos os dias de '+APP.AY;
+  renderTable();
+  loadEntriesForStoreYear(APP.AS, APP.AY).then(f=>{Object.assign(APP.entries,f);renderTable();}).catch(()=>{});
+  if(APP.AY===APP.CYR) setTimeout(scrollToToday,60);
+};
+APP._doSave = () => {
+  const elV=document.getElementById('iv'), elT=document.getElementById('it'), elP=document.getElementById('ip');
+  const hasVenda = elV&&elV.value!=='';
+  if (hasVenda) {
+    const erros=[];
+    if(!elT||elT.value==='') erros.push('TPAs');
+    if(!elP||elP.value==='') erros.push('Padeiros');
+    if (erros.length) {
+      if(elT&&elT.value===''){elT.style.borderColor='var(--red)';elT.style.background='var(--rbg)';}else if(elT){elT.style.borderColor='';elT.style.background='';}
+      if(elP&&elP.value===''){elP.style.borderColor='var(--red)';elP.style.background='var(--rbg)';}else if(elP){elP.style.borderColor='';elP.style.background='';}
+      const m=document.getElementById('smsg'); if(m){m.textContent='⚠ Obrigatório: '+erros.join(' e ');m.style.color='var(--red)';m.classList.add('on');setTimeout(()=>{m.classList.remove('on');setTimeout(()=>{m.textContent='✓ Guardado';m.style.color='var(--green)';},200);},3000);}
+      return;
     }
-  } catch (error) {
-    console.error('[App] Erro ao renderizar módulo:', error);
-    Loading.showError(main, 'Erro ao carregar módulo. Verifique a ligação ao Firebase.', () => renderModule(module));
   }
-}
-
-/* ============================================================
-   LOJAS
-   ============================================================ */
-async function loadStores() {
-  try {
-    State.stores = await StoresDB.getAll();
-    if (!State.stores.length) {
-      // Usar dados demo se não houver lojas
-      State.stores = getDemoStores();
-    }
-    if (State.stores.length && !State.selectedStore) {
-      State.selectedStore = State.stores[0];
-    }
-    populateStoreSelectors();
-  } catch (e) {
-    console.warn('[App] Usando dados demo (Firebase não configurado)');
-    State.stores = getDemoStores();
-    State.selectedStore = State.stores[0];
-    populateStoreSelectors();
-  }
-}
-
-function populateStoreSelectors() {
-  document.querySelectorAll('.store-select').forEach(sel => {
-    sel.innerHTML = State.stores.map(s =>
-      `<option value="${s.id}" ${State.selectedStore?.id === s.id ? 'selected' : ''}>${s.id} · ${s.name}</option>`
-    ).join('');
-    sel.addEventListener('change', (e) => {
-      State.selectedStore = State.stores.find(s => s.id === e.target.value);
-      renderModule(State.currentModule);
-    });
+  if(elT){elT.style.borderColor='';elT.style.background='';}
+  if(elP){elP.style.borderColor='';elP.style.background='';}
+  [['iv','venda_dia',false],['it','tpas',false],['ip','padeiros',false],['io','obs',true]].forEach(([id,k,isStr])=>{
+    const el=document.getElementById(id); if(!el)return;
+    sE(APP.AS,APP.ED,k,isStr?(el.value||null):(el.value!==''?+el.value:null));
   });
+  const m=document.getElementById('smsg'); if(m){m.textContent='✓ Guardado';m.style.color='var(--green)';m.classList.add('on');setTimeout(()=>m.classList.remove('on'),2000);}
+  renderTable();
+};
+
+function scrollToToday() {
+  const r=document.getElementById('row-'+APP.TODAY); if(!r) return;
+  const w=document.getElementById('ktwrap'); if(w) w.scrollTop=r.offsetTop-w.clientHeight/2+r.clientHeight/2;
+  r.style.transition='background .1s'; r.style.background='#ffeaa0'; setTimeout(()=>r.style.background='',700);
+}
+
+function _updateGerenteHdr(dt) {
+  const el = document.getElementById('gerente-hdr'); if (!el) return;
+  const g = (APP.GERENTE_DATA||{})[APP.AS];
+  el.textContent = g ? g.nome || '' : '';
 }
 
 /* ============================================================
-   DEMO DATA (sem Firebase configurado)
+   ANALISES — sub-views
    ============================================================ */
-function getDemoStores() {
-  return [
-    { id: 'A001', name: 'Luanda Centro', city: 'Luanda', supervisor: 'Ana Silva', manager: 'João Costa', active: true, area: 850 },
-    { id: 'A002', name: 'Talatona', city: 'Luanda', supervisor: 'Pedro Mendes', manager: 'Maria Fonseca', active: true, area: 1200 },
-    { id: 'A003', name: 'Viana', city: 'Viana', supervisor: 'Ana Silva', manager: 'Carlos Lima', active: true, area: 950 },
-    { id: 'A004', name: 'Cacuaco', city: 'Luanda', supervisor: 'Pedro Mendes', manager: 'Rita Sousa', active: true, area: 780 },
-    { id: 'A005', name: 'Benguela', city: 'Benguela', supervisor: 'Luís Rocha', manager: 'Paula Neto', active: true, area: 1100 },
+function _renderAnalises() { _switchSub('topflop'); }
+
+function _renderSubView(sub) {
+  const body = document.getElementById('as-'+sub); if(!body) return;
+  if (sub==='topflop')   _renderTopFlop();
+  else if (sub==='pao')  _renderPao();
+  else if(sub==='sales') _renderSalesRatio();
+}
+
+function _renderTopFlop() {
+  const el = document.getElementById('tf-content'); if (!el) return;
+  const dt = document.getElementById('tf-date')?.value || APP.TODAY;
+  const campos = [
+    { key:'vs', label:'Venda SAP', fmt: v=>Fmt.kz(v), asc:false },
+    { key:'ru', label:'Rutura %',  fmt: v=>v!=null?v.toFixed(2)+'%':'—', asc:true },
+    { key:'cl', label:'Clientes',  fmt: v=>Fmt.n(v), asc:false },
+    { key:'vp', label:'Venda Pão', fmt: v=>Fmt.n(v), asc:false },
   ];
+  el.innerHTML = campos.map(({ key, label, fmt, asc }) => {
+    const rows = Object.entries(APP.DB)
+      .map(([c, st]) => ({ c, n: st.n, v: gS(c,dt)?.[key] }))
+      .filter(x => x.v != null && !isNaN(x.v))
+      .sort((a,b) => asc ? a.v-b.v : b.v-a.v);
+    const top5 = rows.slice(0,5), flop5 = [...rows].reverse().slice(0,5);
+    const mkList = (arr, good) => arr.map((x,i) => `<div class="brow"><div class="blbl w">${x.c} ${x.n}</div><div class="bval" style="color:${good?'var(--green)':'var(--red)'}">${fmt(x.v)}</div></div>`).join('');
+    return `<div class="panel"><div class="phdr">${label}</div><div class="blist">${mkList(top5,!asc)}</div><div class="phdr" style="border-top:1px solid var(--bd)">Flop 5</div><div class="blist">${mkList(flop5,asc)}</div></div>`;
+  }).join('');
 }
 
-function generateDemoKPIs(storeId, days = 30) {
-  const result = [];
-  const seed = storeId.charCodeAt(storeId.length - 1);
-  const baseRevenue = 1_400_000 + seed * 80_000;
-
-  for (let d = days - 1; d >= 0; d--) {
-    const date = new Date();
-    date.setDate(date.getDate() - d);
-    const dow = date.getDay();
-    const weekendBoost = (dow === 5 || dow === 6) ? 1.3 : 1;
-    const variance = 0.85 + Math.random() * 0.3;
-    const revenue = Math.round(baseRevenue * weekendBoost * variance);
-    const customers = Math.round((300 + seed * 15) * weekendBoost * variance);
-    result.push({
-      dateStr: date.toISOString().split('T')[0],
-      date,
-      revenue,
-      customers,
-      avgTicket: Math.round(revenue / customers),
-      waste: Math.round(revenue * (0.01 + Math.random() * 0.015)),
-      storeId,
-    });
-  }
-  return result;
+function _renderPao() {
+  const el = document.getElementById('as-pao'); if (!el) return;
+  const curMes = APP.TODAY.substring(0,7);
+  const lojas = APP.ADMCFG.lojas.filter(l=>_isLojaActiva(l.c,curMes)).map(l => {
+    const pd = PAO_DATA[l.c] || {};
+    const meses = Object.keys(pd).sort();
+    const last = meses.length ? pd[meses[meses.length-1]] : null;
+    return { c:l.c, n:l.n||l.c, pao:last?.pao, h1:last?.h1, hu:last?.hu, pot:PAO_POTENCIAL[l.c]||null };
+  }).sort((a,b)=>(b.pao||0)-(a.pao||0));
+  const max = Math.max(1,...lojas.map(l=>l.pao||0));
+  el.innerHTML = `<div class="sechdr"><h2>Pão</h2><p>Venda média diária e horários · último mês</p></div>
+  <div class="panel"><div class="phdr">Ranking por venda média de pão</div><div class="blist">
+  ${lojas.map(l=>`<div class="brow"><div class="blbl w" title="${l.n}">${l.c} ${l.n}</div><div class="btrack"><div class="bfill" style="width:${l.pao?Math.max(1,l.pao/max*100).toFixed(1):0}%;background:#d4a800"></div></div><div class="bval">${l.pao?Fmt.n(Math.round(l.pao)):' —'}</div></div>`).join('')}
+  </div></div>`;
 }
 
-/* ============================================================
-   MÓDULO: DASHBOARD
-   ============================================================ */
-async function renderDashboard(container) {
-  const store = State.selectedStore;
-  if (!store) {
-    container.innerHTML = `<div class="empty-state"><p>Selecione uma loja</p></div>`;
-    return;
-  }
-
-  let kpis = [];
+async function _renderSalesRatio() {
+  const el = document.getElementById('as-sales'); if (!el) return;
+  Loading.show(el, 'A ler Sales Ratio…');
   try {
-    kpis = await KPIsDB.getByStoreAndMonth(store.id, State.currentYear, State.currentMonth);
-  } catch {
-    kpis = generateDemoKPIs(store.id);
+    const { skuArr, catArr, totalVendas, top200_pct } = await loadSalesRatio();
+    el.innerHTML = `<div class="sechdr"><h2>Sales Ratio</h2><p>Top 200 SKUs = ${top200_pct.toFixed(1)}% das vendas · Total: ${Fmt.kz(totalVendas)}</p></div>
+    <div class="panels">
+      <div class="panel"><div class="phdr">Por Categoria</div><div class="blist">
+      ${catArr.slice(0,15).map(c=>bRow(c.c,c.v,catArr[0].v,'#0070F3',Fmt.kz(c.v)+' ('+c.pct.toFixed(1)+'%)')).join('')}
+      </div></div>
+      <div class="panel"><div class="phdr">Top 20 SKUs</div><div class="atw"><table class="at"><thead><tr><th class="lft">Descrição</th><th>Vendas</th><th>%</th><th>% Acum.</th></tr></thead><tbody>
+      ${skuArr.slice(0,20).map(s=>`<tr><td class="lft" style="font-size:11px">${s.desc||s.sku}</td><td>${Fmt.kz(s.v)}</td><td>${s.pct.toFixed(2)}%</td><td>${s.pac.toFixed(1)}%</td></tr>`).join('')}
+      </tbody></table></div></div>
+    </div>`;
+  } catch(e) {
+    Loading.showError(el, 'Erro ao carregar Sales Ratio: ' + e.message);
   }
+}
 
-  let prevKpis = [];
+/* ============================================================
+   CONTAGENS
+   ============================================================ */
+async function _renderContagens() {
+  const el = document.getElementById('sh-contagens'); if (!el) return;
+  const main = el.querySelector('.km') || el;
+  Loading.show(main, 'A carregar contagens…');
   try {
-    const prevMonth = State.currentMonth === 1 ? 12 : State.currentMonth - 1;
-    const prevYear = State.currentMonth === 1 ? State.currentYear - 1 : State.currentYear;
-    prevKpis = await KPIsDB.getByStoreAndMonth(store.id, prevYear, prevMonth);
-  } catch {
-    prevKpis = generateDemoKPIs(store.id, 30).map(k => ({
-      ...k,
-      revenue: Math.round(k.revenue * 0.93),
-      customers: Math.round(k.customers * 0.91),
-    }));
-  }
-
-  // Totais mês atual
-  const totalRevenue = kpis.reduce((s, k) => s + (k.revenue || 0), 0);
-  const totalCustomers = kpis.reduce((s, k) => s + (k.customers || 0), 0);
-  const totalWaste = kpis.reduce((s, k) => s + (k.waste || 0), 0);
-  const avgTicket = totalCustomers > 0 ? totalRevenue / totalCustomers : 0;
-
-  // Totais mês anterior
-  const prevRevenue = prevKpis.reduce((s, k) => s + (k.revenue || 0), 0);
-  const prevCustomers = prevKpis.reduce((s, k) => s + (k.customers || 0), 0);
-
-  const revDelta = prevRevenue ? ((totalRevenue - prevRevenue) / prevRevenue) * 100 : null;
-  const custDelta = prevCustomers ? ((totalCustomers - prevCustomers) / prevCustomers) * 100 : null;
-
-  // Sparklines data
-  const revenueData = kpis.map(k => k.revenue);
-  const customerData = kpis.map(k => k.customers);
-
-  // Target mock
-  const target = { revenueTarget: 55_000_000, customersTarget: 9000, wasteTarget: 800_000 };
-
-  // Ranking
-  const rankingData = State.stores.map(s => {
-    const demo = generateDemoKPIs(s.id);
-    const rev = demo.reduce((acc, k) => acc + k.revenue, 0);
-    return { ...s, revenue: rev };
-  }).sort((a, b) => b.revenue - a.revenue);
-
-  const todayKpi = kpis[kpis.length - 1];
-
-  container.innerHTML = `
-    <div class="module-header">
-      <div class="module-header-left">
-        <div class="store-badge">${store.id}</div>
-        <div>
-          <h2>${store.name}</h2>
-          <p class="text-muted">${store.city} · Gerente: ${store.manager || '—'}</p>
-        </div>
-      </div>
-      <div class="module-header-right">
-        <select class="store-select select"></select>
-        <div class="month-picker">
-          <button class="btn-icon" id="btn-prev-month">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <span id="month-label">${Fmt.date(new Date(State.currentYear, State.currentMonth - 1), 'monthYear')}</span>
-          <button class="btn-icon" id="btn-next-month">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div class="kpi-grid">
-      ${buildKPICard({ label: 'Vendas MTD', value: Fmt.currency(totalRevenue), sub: `Hoje: ${Fmt.currency(todayKpi?.revenue)}`, trend: revDelta, trendPositive: revDelta >= 0, color: 'blue',
-        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>` })}
-      ${buildKPICard({ label: 'Clientes MTD', value: Fmt.number(totalCustomers), sub: `Hoje: ${Fmt.number(todayKpi?.customers)}`, trend: custDelta, trendPositive: custDelta >= 0, color: 'indigo',
-        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>` })}
-      ${buildKPICard({ label: 'Ticket Médio', value: Fmt.currency(avgTicket), sub: `Hoje: ${Fmt.currency(todayKpi?.avgTicket)}`, color: 'violet',
-        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>` })}
-      ${buildKPICard({ label: 'Quebras MTD', value: Fmt.currency(totalWaste), sub: `${((totalWaste / totalRevenue) * 100).toFixed(2)}% das vendas`, trendPositive: false, color: 'red',
-        icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h18l-1.5 10H4.5L3 3z"/><path d="M16 16a2 2 0 100 4 2 2 0 000-4z"/><path d="M8 16a2 2 0 100 4 2 2 0 000-4z"/></svg>` })}
-    </div>
-
-    <div class="dashboard-grid">
-      <div class="card card-chart">
-        <div class="card-header">
-          <h3>Vendas Diárias</h3>
-          <span class="badge">${Fmt.date(new Date(State.currentYear, State.currentMonth - 1), 'monthYear')}</span>
-        </div>
-        <div id="chart-revenue" class="chart-area"></div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h3>Objetivos do Mês</h3>
-        </div>
-        <div class="targets-list">
-          <div class="target-item">
-            <div class="target-label">
-              <span>Vendas</span>
-              <span>${Fmt.currency(totalRevenue)} / ${Fmt.currency(target.revenueTarget)}</span>
-            </div>
-            ${buildProgressBar(totalRevenue, target.revenueTarget)}
-          </div>
-          <div class="target-item">
-            <div class="target-label">
-              <span>Clientes</span>
-              <span>${Fmt.number(totalCustomers)} / ${Fmt.number(target.customersTarget)}</span>
-            </div>
-            ${buildProgressBar(totalCustomers, target.customersTarget)}
-          </div>
-          <div class="target-item">
-            <div class="target-label">
-              <span>Quebras (máx.)</span>
-              <span>${Fmt.currency(totalWaste)} / ${Fmt.currency(target.wasteTarget)}</span>
-            </div>
-            ${buildProgressBar(target.wasteTarget - totalWaste, target.wasteTarget)}
-          </div>
-        </div>
-      </div>
-
-      <div class="card card-ranking">
-        <div class="card-header">
-          <h3>Ranking de Lojas</h3>
-          <span class="text-muted text-sm">por volume de vendas</span>
-        </div>
-        <div class="ranking-list">
-          ${rankingData.map((s, i) => `
-            <div class="ranking-item ${s.id === store.id ? 'ranking-item-active' : ''}">
-              <span class="ranking-pos">${i + 1}</span>
-              <div class="ranking-info">
-                <span class="ranking-name">${s.id} · ${s.name}</span>
-                <span class="ranking-value">${Fmt.currency(s.revenue)}</span>
-              </div>
-              <div class="ranking-bar-wrap">
-                <div class="ranking-bar" style="width:${Math.round((s.revenue / rankingData[0].revenue) * 100)}%"></div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h3>Últimos 7 Dias</h3>
-        </div>
-        ${buildTable({
-          columns: [
-            { key: 'dateStr', label: 'Data', render: v => Fmt.date(v, 'medium') },
-            { key: 'revenue', label: 'Vendas', render: v => Fmt.currency(v) },
-            { key: 'customers', label: 'Clientes', render: v => Fmt.number(v) },
-            { key: 'avgTicket', label: 'Ticket', render: v => Fmt.currency(v) },
-            { key: 'waste', label: 'Quebras', render: v => Fmt.currency(v) },
-          ],
-          rows: kpis.slice(-7).reverse(),
-        })}
-      </div>
-    </div>
-  `;
-
-  populateStoreSelectors();
-  renderRevenueChart(kpis);
-
-  document.getElementById('btn-prev-month')?.addEventListener('click', () => {
-    if (State.currentMonth === 1) { State.currentMonth = 12; State.currentYear--; }
-    else State.currentMonth--;
-    renderModule('dashboard');
-  });
-  document.getElementById('btn-next-month')?.addEventListener('click', () => {
-    if (State.currentMonth === 12) { State.currentMonth = 1; State.currentYear++; }
-    else State.currentMonth++;
-    renderModule('dashboard');
-  });
+    const data = await InventoryCounts.loadAll();
+    let rows = [];
+    Object.entries(data).forEach(([dt, lojas]) => {
+      Object.entries(lojas).forEach(([loja, turnos]) => {
+        Object.entries(turnos).forEach(([turno, entry]) => {
+          if (!entry) return;
+          rows.push({ dt, loja, turno, ...entry });
+        });
+      });
+    });
+    rows.sort((a,b)=>b.dt.localeCompare(a.dt));
+    main.innerHTML = `<div class="pghdr"><div class="pgtit"><h2>Contagens Diárias</h2></div>
+    <button class="bsave" onclick="APP._openNovaContagem()">+ Nova Contagem</button></div>
+    <div class="ttb"><input type="text" id="cont-search" placeholder="Pesquisar…" oninput="filterTable(document.getElementById('cont-table'),this.value)">
+    <button class="btn-up" onclick="exportCSV(APP._contRows,'contagens')">Exportar CSV</button></div>
+    <div class="atw tall"><table class="at" id="cont-table"><thead><tr><th class="lft">Data</th><th class="lft">Loja</th><th class="lft">Turno</th><th class="lft">Responsável</th><th class="lft">Secção</th><th>Contado</th><th>Sistema</th><th>Diferença</th></tr></thead><tbody>
+    ${rows.map(r=>{const diff=(r.contado||0)-(r.sistema||0);const dc=diff<0?'vb':diff>0?'vg':'ve';return`<tr><td>${r.dt}</td><td>${r.loja}</td><td>${r.turno}</td><td>${r.responsavel||'—'}</td><td>${r.seccao||'—'}</td><td>${Fmt.n(r.contado)}</td><td>${Fmt.n(r.sistema)}</td><td class="${dc}">${diff>=0?'+':''}${diff}</td></tr>`;}).join('')}
+    </tbody></table></div>`;
+    APP._contRows = rows;
+  } catch(e) { Loading.showError(main, 'Erro: ' + e.message); }
 }
 
-function renderRevenueChart(kpis) {
-  const container = document.getElementById('chart-revenue');
-  if (!container || !kpis.length) return;
-
-  const max = Math.max(...kpis.map(k => k.revenue));
-  const barWidth = Math.max(4, Math.floor(container.offsetWidth / kpis.length) - 3);
-
-  container.innerHTML = `
-    <div class="bar-chart">
-      ${kpis.map(k => {
-        const pct = (k.revenue / max) * 100;
-        const isToday = k.dateStr === new Date().toISOString().split('T')[0];
-        return `
-          <div class="bar-col" title="${Fmt.date(k.dateStr, 'medium')}: ${Fmt.currency(k.revenue)}">
-            <div class="bar-fill ${isToday ? 'bar-today' : ''}" style="height:${pct}%"></div>
-            <span class="bar-label">${new Date(k.dateStr + 'T12:00:00').getDate()}</span>
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
-}
-
-/* ============================================================
-   MÓDULO: ANÁLISES
-   ============================================================ */
-async function renderAnalytics(container) {
-  const store = State.selectedStore;
-  let kpis = generateDemoKPIs(store?.id || 'A001', 60);
-
-  // Calcular top/flop por dia da semana
-  const byDay = {};
-  kpis.forEach(k => {
-    const day = new Date(k.dateStr + 'T12:00:00').toLocaleDateString('pt-PT', { weekday: 'long' });
-    if (!byDay[day]) byDay[day] = { total: 0, count: 0 };
-    byDay[day].total += k.revenue;
-    byDay[day].count++;
-  });
-
-  const byDayArr = Object.entries(byDay).map(([day, v]) => ({
-    day, avg: Math.round(v.total / v.count), total: v.total
-  })).sort((a, b) => b.avg - a.avg);
-
-  const last30 = kpis.slice(-30);
-  const top10days = [...last30].sort((a, b) => b.revenue - a.revenue).slice(0, 10);
-  const flop10days = [...last30].sort((a, b) => a.revenue - b.revenue).slice(0, 10);
-
-  container.innerHTML = `
-    <div class="module-header">
-      <div class="module-header-left">
-        <h2>Análises</h2>
-        <p class="text-muted">Últimos 30 dias · ${store?.name || 'Todas as lojas'}</p>
-      </div>
-      <div class="module-header-right">
-        <select class="store-select select"></select>
-      </div>
-    </div>
-
-    <div class="analytics-grid">
-      <div class="card">
-        <div class="card-header"><h3>🏆 Top 10 Dias — Vendas</h3></div>
-        ${buildTable({
-          columns: [
-            { key: 'dateStr', label: 'Data', render: v => Fmt.date(v, 'medium') },
-            { key: 'revenue', label: 'Vendas', render: v => `<strong>${Fmt.currency(v)}</strong>` },
-            { key: 'customers', label: 'Clientes', render: v => Fmt.number(v) },
-          ],
-          rows: top10days,
-        })}
-      </div>
-
-      <div class="card">
-        <div class="card-header"><h3>📉 Flop 10 Dias — Vendas</h3></div>
-        ${buildTable({
-          columns: [
-            { key: 'dateStr', label: 'Data', render: v => Fmt.date(v, 'medium') },
-            { key: 'revenue', label: 'Vendas', render: v => `<span style="color:var(--red)">${Fmt.currency(v)}</span>` },
-            { key: 'customers', label: 'Clientes', render: v => Fmt.number(v) },
-          ],
-          rows: flop10days,
-        })}
-      </div>
-
-      <div class="card card-full">
-        <div class="card-header">
-          <h3>Média por Dia da Semana</h3>
-        </div>
-        <div class="weekday-chart">
-          ${byDayArr.map(d => {
-            const pct = (d.avg / byDayArr[0].avg) * 100;
-            return `
-              <div class="weekday-row">
-                <span class="weekday-name">${d.day}</span>
-                <div class="weekday-bar-wrap">
-                  <div class="weekday-bar" style="width:${pct}%"></div>
-                </div>
-                <span class="weekday-value">${Fmt.currency(d.avg)}</span>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-
-      <div class="card card-full">
-        <div class="card-header">
-          <h3>Evolução Mensal — Últimos 30 Dias</h3>
-          <button class="btn btn-sm btn-outline" onclick="exportCSVAnalytics()">Exportar</button>
-        </div>
-        <div id="chart-evolution" class="chart-area chart-area-lg"></div>
-      </div>
-    </div>
-  `;
-
-  populateStoreSelectors();
-  renderEvolutionChart(last30);
-
-  window.exportCSVAnalytics = () => exportToCSV(last30, `analises_${store?.id}`);
-}
-
-function renderEvolutionChart(kpis) {
-  const container = document.getElementById('chart-evolution');
-  if (!container) return;
-
-  const max = Math.max(...kpis.map(k => k.revenue));
-
-  container.innerHTML = `
-    <div class="bar-chart bar-chart-lg">
-      ${kpis.map(k => {
-        const pct = (k.revenue / max) * 100;
-        return `
-          <div class="bar-col" title="${Fmt.date(k.dateStr, 'medium')}: ${Fmt.currency(k.revenue)}">
-            <div class="bar-fill" style="height:${pct}%"></div>
-            <span class="bar-label">${new Date(k.dateStr + 'T12:00:00').getDate()}</span>
-          </div>
-        `;
-      }).join('')}
-    </div>
-  `;
-}
-
-/* ============================================================
-   MÓDULO: INVENTÁRIO / CONTAGENS
-   ============================================================ */
-async function renderInventory(container) {
-  const store = State.selectedStore;
-  let counts = [];
-
+APP._openNovaContagem = () => Modal.open('modal-contagem');
+APP._saveContagem = async () => {
+  const vals = { dt: document.getElementById('nc-dt')?.value, loja: document.getElementById('nc-loja')?.value, turno: document.getElementById('nc-turno')?.value, responsavel: document.getElementById('nc-resp')?.value, seccao: document.getElementById('nc-sec')?.value, contado: +document.getElementById('nc-cont')?.value||0, sistema: +document.getElementById('nc-sis')?.value||0, notas: document.getElementById('nc-notas')?.value };
+  if (!vals.loja || !vals.turno || !vals.responsavel) { Toast.error('Preencha loja, turno e responsável'); return; }
   try {
-    counts = await InventoryDB.getByStore(store?.id || 'A001');
-  } catch {
-    counts = getDemoCounts();
-  }
+    Loading.showOverlay('A guardar…');
+    await InventoryCounts.save(vals.dt, vals.loja, vals.turno, vals);
+    Modal.close('modal-contagem');
+    Toast.success('Contagem guardada!');
+    _renderContagens();
+  } catch(e) { Toast.error('Erro: ' + e.message); }
+  finally { Loading.hideOverlay(); }
+};
 
-  container.innerHTML = `
-    <div class="module-header">
-      <div class="module-header-left">
-        <h2>Contagens / Inventários</h2>
-        <p class="text-muted">${store?.name || '—'}</p>
-      </div>
-      <div class="module-header-right">
-        <select class="store-select select"></select>
-        <button class="btn btn-primary" onclick="openNewCount()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nova Contagem
-        </button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-header">
-        <div class="search-wrap">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="inventory-search" class="search-input" placeholder="Pesquisar contagens...">
-        </div>
-        <button class="btn btn-sm btn-outline" onclick="exportInventory()">Exportar Excel</button>
-      </div>
-      <div id="inventory-table">
-        ${buildTable({
-          columns: [
-            { key: 'date', label: 'Data', render: v => Fmt.date(v, 'medium') },
-            { key: 'shift', label: 'Turno' },
-            { key: 'responsible', label: 'Responsável' },
-            { key: 'section', label: 'Secção' },
-            { key: 'counted', label: 'Contado', render: v => Fmt.number(v) },
-            { key: 'system', label: 'Sistema', render: v => Fmt.number(v) },
-            { key: 'diff', label: 'Diferença', render: (v, row) => {
-              const diff = (row.counted || 0) - (row.system || 0);
-              const cls = diff < 0 ? 'text-red' : diff > 0 ? 'text-green' : '';
-              return `<span class="${cls}">${diff >= 0 ? '+' : ''}${diff}</span>`;
-            }},
-            { key: 'status', label: 'Estado', render: v => `<span class="badge badge-${v === 'ok' ? 'success' : 'warning'}">${v === 'ok' ? 'OK' : 'Pendente'}</span>` },
-          ],
-          rows: counts,
-          emptyMsg: 'Sem contagens registadas'
-        })}
-      </div>
-    </div>
-
-    <!-- Modal Nova Contagem -->
-    <div class="modal-overlay" id="modal-count">
-      <div class="modal-box">
-        <div class="modal-header">
-          <h3>Nova Contagem</h3>
-          <button class="btn-icon" onclick="closeModal('modal-count')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Data</label>
-              <input type="date" id="count-date" class="input" value="${new Date().toISOString().split('T')[0]}">
-            </div>
-            <div class="form-group">
-              <label>Turno</label>
-              <select id="count-shift" class="select">
-                <option>Manhã</option><option>Tarde</option><option>Noite</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Responsável</label>
-              <input type="text" id="count-responsible" class="input" placeholder="Nome do responsável">
-            </div>
-            <div class="form-group">
-              <label>Secção</label>
-              <input type="text" id="count-section" class="input" placeholder="Ex: Charcutaria, Padaria...">
-            </div>
-            <div class="form-group">
-              <label>Qtd. Contada</label>
-              <input type="number" id="count-counted" class="input" placeholder="0">
-            </div>
-            <div class="form-group">
-              <label>Qtd. Sistema</label>
-              <input type="number" id="count-system" class="input" placeholder="0">
-            </div>
-            <div class="form-group form-group-full">
-              <label>Justificação</label>
-              <textarea id="count-notes" class="input textarea" placeholder="Motivo da diferença..."></textarea>
-            </div>
-            <div class="form-group form-group-full">
-              <label>Anexo</label>
-              <input type="file" id="count-file" class="input-file" accept="image/*,.pdf">
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-outline" onclick="closeModal('modal-count')">Cancelar</button>
-          <button class="btn btn-primary" onclick="saveCount()">Guardar Contagem</button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  populateStoreSelectors();
-
-  document.getElementById('inventory-search')?.addEventListener('input', debounce((e) => {
-    const table = document.querySelector('#inventory-table table');
-    filterTable(table, e.target.value);
-  }));
-
-  window.openNewCount = () => Modal.open('modal-count');
-  window.closeModal = (id) => Modal.close(id);
-  window.exportInventory = () => exportToCSV(counts, `contagens_${store?.id}`);
-  window.saveCount = saveCount;
-}
-
-async function saveCount() {
-  const data = {
-    storeId: State.selectedStore?.id,
-    date: document.getElementById('count-date')?.value,
-    shift: document.getElementById('count-shift')?.value,
-    responsible: document.getElementById('count-responsible')?.value,
-    section: document.getElementById('count-section')?.value,
-    counted: parseInt(document.getElementById('count-counted')?.value) || 0,
-    system: parseInt(document.getElementById('count-system')?.value) || 0,
-    notes: document.getElementById('count-notes')?.value,
-    status: 'pending',
-  };
-
-  if (!data.responsible || !data.section) {
-    Toast.error('Preencha o responsável e a secção');
-    return;
-  }
-
+/* ============================================================
+   ROTEIRO SUPERVISORES
+   ============================================================ */
+async function _renderRoteiro() {
+  const el = document.getElementById('sh-sup'); if (!el) return;
+  const main = el.querySelector('.km') || el;
+  Loading.show(main, 'A carregar roteiro…');
   try {
-    Loading.showOverlay('A guardar contagem...');
-    const file = document.getElementById('count-file')?.files[0];
-    if (file) {
-      const path = `counts/${data.storeId}/${Date.now()}_${file.name}`;
-      data.attachmentUrl = await StorageDB.upload(path, file);
-    }
-    await InventoryDB.save(data);
-    Modal.close('modal-count');
-    Toast.success('Contagem guardada com sucesso!');
-    renderModule('inventory');
-  } catch (e) {
-    console.error(e);
-    Toast.error('Erro ao guardar. Verifique o Firebase.');
-  } finally {
-    Loading.hideOverlay();
+    const data = await SupReviews.loadAll();
+    Object.assign(APP.SUP_DATA, data);
+    const rows = [];
+    Object.entries(data).forEach(([mes, sups]) => {
+      Object.entries(sups).forEach(([sup, entries]) => {
+        Object.entries(entries).forEach(([key, val]) => {
+          rows.push({ mes, sup, key, loja: val.__centro__||val.centro||'', nota: val.__final__||val.final, dt: key.match(/(\d{4}-\d{2}-\d{2})/)?.[1]||key });
+        });
+      });
+    });
+    rows.sort((a,b) => b.dt.localeCompare(a.dt));
+    main.innerHTML = `<div class="pghdr"><div class="pgtit"><h2>Roteiro de Supervisores</h2></div></div>
+    <div class="atw tall"><table class="at"><thead><tr><th class="lft">Data</th><th class="lft">Supervisor</th><th class="lft">Loja</th><th>Nota Final</th></tr></thead><tbody>
+    ${rows.map(r=>{const nota=parseFloat(r.nota);const nc=!isNaN(nota)?(nota>=7?'vg':nota>=5?'vw':'vb'):'ve';return`<tr><td>${r.dt}</td><td>${r.sup}</td><td>${r.loja||'—'}</td><td class="${nc} mc">${!isNaN(nota)?nota.toFixed(1):'—'}</td></tr>`;}).join('')}
+    </tbody></table></div>`;
+  } catch(e) { Loading.showError(main, 'Erro: ' + e.message); }
+}
+
+/* ============================================================
+   ADMIN
+   ============================================================ */
+function _renderAdmin() {
+  const el = document.getElementById('sh-adm'); if (!el) return;
+  const main = el.querySelector('.km') || el;
+  const lojas = APP.ADMCFG.lojas || [];
+  main.innerHTML = `<div class="pghdr"><div class="pgtit"><h2>Administração</h2></div></div>
+  <div class="panels">
+    <div class="panel"><div class="phdr">Lojas (${lojas.length})<span class="ps">configuradas</span></div>
+    <div class="blist">${lojas.map(l=>`<div class="brow"><div class="blbl w"><b style="font-family:var(--mono);font-size:10px;color:var(--t3)">${l.c}</b> ${l.n||l.c}</div><div class="bval" style="font-size:10px;color:var(--t3)">${l.s||'—'}</div></div>`).join('')}</div></div>
+    <div class="panel"><div class="phdr">Sistema</div>
+    <div class="blist" style="padding:12px 16px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">Cache local</div><div style="font-size:11px;color:var(--t3)">${Cache.size()} entradas</div></div><button class="btn-up" onclick="APP._clearCache()">Limpar</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">Backup</div><div style="font-size:11px;color:var(--t3)">Exportar configuração JSON</div></div><button class="btn-up" onclick="APP._backup()">Exportar</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">Sync Google Sheets</div><div style="font-size:11px;color:var(--t3)">Forçar sincronização manual</div></div><button class="bsave" onclick="APP._syncNow()">Sincronizar</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">Modo realtime</div><div style="font-size:11px;color:var(--t3)">Firebase listeners em tempo real</div></div><button class="btn-up" onclick="APP._toggleRealtime()">${localStorage.getItem('karta_realtime')==='1'?'Desativar':'Ativar'}</button></div>
+    </div></div>
+  </div>`;
+}
+
+APP._clearCache = () => Modal.confirm('Limpar cache', 'Tem a certeza?', () => { Cache.clear(); Toast.success('Cache limpa!'); _renderAdmin(); });
+APP._backup    = () => backupExport(msg => Toast.info(msg));
+APP._syncNow   = () => _syncSheets(true);
+APP._toggleRealtime = () => { const r=localStorage.getItem('karta_realtime')==='1'; localStorage.setItem('karta_realtime',r?'0':'1'); Toast.info('Reload para aplicar'); setTimeout(()=>location.reload(),1200); };
+
+/* ============================================================
+   GOOGLE SHEETS SYNC
+   ============================================================ */
+async function _syncSheets(force=false) {
+  _gsStatus('A sincronizar…');
+  try {
+    await gsSyncAll(APP.DB, msg => _gsStatus(msg));
+    // Re-render se loja activa
+    if (APP.AS && APP.view==='kpi') renderTable();
+  } catch(e) {
+    _gsStatus('Erro sync');
+    if (force) Toast.error('Erro sync: ' + e.message);
   }
 }
 
-function getDemoCounts() {
-  return [
-    { date: '2025-05-15', shift: 'Manhã', responsible: 'Manuel Santos', section: 'Charcutaria', counted: 48, system: 52, status: 'pending' },
-    { date: '2025-05-14', shift: 'Tarde', responsible: 'Rosa Fernandes', section: 'Padaria', counted: 120, system: 120, status: 'ok' },
-    { date: '2025-05-13', shift: 'Noite', responsible: 'António Lima', section: 'Bebidas', counted: 245, system: 248, status: 'pending' },
-    { date: '2025-05-12', shift: 'Manhã', responsible: 'Maria Costa', section: 'Frutas', counted: 88, system: 88, status: 'ok' },
-    { date: '2025-05-11', shift: 'Tarde', responsible: 'Carlos Silva', section: 'Congelados', counted: 34, system: 36, status: 'pending' },
-  ];
+function _gsStatus(msg) {
+  const el = document.getElementById('upst'); if (!el) return;
+  el.textContent = msg;
+  el.className = msg.startsWith('✓') ? 'upst ok' : msg.startsWith('⚠')||msg.startsWith('Erro') ? 'upst err' : 'upst';
 }
 
 /* ============================================================
-   MÓDULO: ESCALAS
+   APPDATA ASYNC
    ============================================================ */
-async function renderSchedules(container) {
-  const store = State.selectedStore;
-  const days = getDaysInMonth(State.currentYear, State.currentMonth);
-
-  const employees = [
-    { name: 'Ana Martins', role: 'Caixa' },
-    { name: 'Bruno Costa', role: 'Reposição' },
-    { name: 'Carla Silva', role: 'Caixa' },
-    { name: 'David Santos', role: 'Supervisor' },
-    { name: 'Eva Nunes', role: 'Reposição' },
-  ];
-
-  const shifts = { M: 'Manhã', T: 'Tarde', N: 'Noite', F: 'Folga', '': '—' };
-  const shiftColors = { M: 'badge-blue', T: 'badge-orange', N: 'badge-purple', F: 'badge-gray' };
-
-  // Gerar escala demo
-  const schedule = {};
-  employees.forEach(emp => {
-    schedule[emp.name] = {};
-    days.forEach(d => {
-      const options = ['M', 'T', 'N', 'F', 'M', 'T', 'M'];
-      schedule[emp.name][d] = options[Math.floor(Math.random() * options.length)];
-    });
-  });
-
-  container.innerHTML = `
-    <div class="module-header">
-      <div class="module-header-left">
-        <h2>Escalas</h2>
-        <p class="text-muted">${store?.name || '—'} · ${Fmt.date(new Date(State.currentYear, State.currentMonth - 1), 'monthYear')}</p>
-      </div>
-      <div class="module-header-right">
-        <select class="store-select select"></select>
-        <div class="month-picker">
-          <button class="btn-icon" id="sched-prev-month">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <span>${Fmt.date(new Date(State.currentYear, State.currentMonth - 1), 'monthYear')}</span>
-          <button class="btn-icon" id="sched-next-month">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
-        <button class="btn btn-sm btn-outline" onclick="exportSchedule()">Exportar</button>
-      </div>
-    </div>
-
-    <div class="card p-0">
-      <div class="schedule-legend">
-        ${Object.entries(shifts).filter(([k]) => k).map(([k, v]) =>
-          `<span class="badge ${shiftColors[k]}">${k} = ${v}</span>`
-        ).join('')}
-      </div>
-      <div class="schedule-table-wrap">
-        <table class="schedule-table">
-          <thead>
-            <tr>
-              <th class="schedule-name-col">Colaborador</th>
-              ${days.map(d => {
-                const date = new Date(State.currentYear, State.currentMonth - 1, d);
-                const dow = date.toLocaleDateString('pt-PT', { weekday: 'short' });
-                const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-                return `<th class="${isWeekend ? 'schedule-weekend' : ''}">${d}<br><small>${dow}</small></th>`;
-              }).join('')}
-            </tr>
-          </thead>
-          <tbody>
-            ${employees.map(emp => `
-              <tr>
-                <td class="schedule-name-col">
-                  <div class="schedule-emp">
-                    <span class="emp-avatar">${emp.name[0]}</span>
-                    <div>
-                      <div class="emp-name">${emp.name}</div>
-                      <div class="emp-role">${emp.role}</div>
-                    </div>
-                  </div>
-                </td>
-                ${days.map(d => {
-                  const shift = schedule[emp.name][d] || '';
-                  return `<td class="schedule-cell ${shift === 'F' ? 'cell-folga' : ''}">
-                    <span class="shift-badge ${shiftColors[shift] || ''}">${shift || '—'}</span>
-                  </td>`;
-                }).join('')}
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-
-  populateStoreSelectors();
-  document.getElementById('sched-prev-month')?.addEventListener('click', () => {
-    if (State.currentMonth === 1) { State.currentMonth = 12; State.currentYear--; }
-    else State.currentMonth--;
-    renderModule('schedules');
-  });
-  document.getElementById('sched-next-month')?.addEventListener('click', () => {
-    if (State.currentMonth === 12) { State.currentMonth = 1; State.currentYear++; }
-    else State.currentMonth++;
-    renderModule('schedules');
-  });
-  window.exportSchedule = () => Toast.info('Exportação de escala em desenvolvimento');
-}
-
-function getDaysInMonth(year, month) {
-  const n = new Date(year, month, 0).getDate();
-  return Array.from({ length: n }, (_, i) => i + 1);
+async function _loadAppData() {
+  // FORM_DATA (SM)
+  try { const v=await AppData.get('sm_form'); if(v){APP.FORM_DATA=v;if(APP.AS)renderTable();} } catch(e){}
+  // SUP_DATA
+  try { const v=await AppData.get('sup_data'); if(v){Object.assign(APP.SUP_DATA,v);} } catch(e){}
+  // Gerentes
+  try { const v=await AppData.get('gerentes'); if(v){Object.assign(APP.GERENTE_DATA,v);_updateGerenteHdr();} } catch(e){}
 }
 
 /* ============================================================
-   MÓDULO: ROTEIRO SUPERVISORES
+   UPLOAD EXCEL
    ============================================================ */
-async function renderReviews(container) {
-  const store = State.selectedStore;
-
-  const checklistItems = [
-    { id: 'limpeza', label: 'Limpeza geral da loja', category: 'Higiene' },
-    { id: 'lineares', label: 'Lineares completos e organizados', category: 'Merchandising' },
-    { id: 'precos', label: 'Etiquetas de preço corretas', category: 'Merchandising' },
-    { id: 'validades', label: 'Controlo de validades', category: 'Produto' },
-    { id: 'temperaturas', label: 'Temperaturas dos frios OK', category: 'Produto' },
-    { id: 'caixa', label: 'Filas de caixa controladas', category: 'Operação' },
-    { id: 'equipa', label: 'Equipa completa e uniformizada', category: 'Recursos' },
-    { id: 'seguranca', label: 'Saídas de emergência livres', category: 'Segurança' },
-    { id: 'promotions', label: 'Promoções bem sinalizadas', category: 'Merchandising' },
-    { id: 'bacoffice', label: 'Backoffice organizado', category: 'Operação' },
-  ];
-
-  const demoReviews = [
-    { date: '2025-05-10', supervisor: 'Ana Silva', score: 87, status: 'complete' },
-    { date: '2025-04-28', supervisor: 'Ana Silva', score: 82, status: 'complete' },
-    { date: '2025-04-15', supervisor: 'Pedro Mendes', score: 91, status: 'complete' },
-  ];
-
-  container.innerHTML = `
-    <div class="module-header">
-      <div class="module-header-left">
-        <h2>Roteiro de Supervisores</h2>
-        <p class="text-muted">${store?.name || '—'}</p>
-      </div>
-      <div class="module-header-right">
-        <select class="store-select select"></select>
-        <button class="btn btn-primary" onclick="openNewReview()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nova Visita
-        </button>
-      </div>
-    </div>
-
-    <div class="reviews-grid">
-      <div class="card">
-        <div class="card-header"><h3>Histórico de Visitas</h3></div>
-        ${buildTable({
-          columns: [
-            { key: 'date', label: 'Data', render: v => Fmt.date(v, 'medium') },
-            { key: 'supervisor', label: 'Supervisor' },
-            { key: 'score', label: 'Nota', render: v => {
-              const cls = v >= 90 ? 'badge-success' : v >= 75 ? 'badge-warning' : 'badge-danger';
-              return `<span class="badge ${cls}">${v}/100</span>`;
-            }},
-            { key: 'status', label: 'Estado', render: v => `<span class="badge badge-success">Concluída</span>` },
-          ],
-          rows: demoReviews,
-        })}
-      </div>
-
-      <div class="card">
-        <div class="card-header"><h3>Score Médio por Categoria</h3></div>
-        <div class="categories-list">
-          ${['Higiene', 'Merchandising', 'Produto', 'Operação', 'Recursos', 'Segurança'].map(cat => {
-            const score = Math.round(70 + Math.random() * 30);
-            const cls = score >= 90 ? 'progress-success' : score >= 75 ? 'progress-warning' : 'progress-danger';
-            return `
-              <div class="cat-row">
-                <span>${cat}</span>
-                <div class="progress-bar-track" style="flex:1;margin:0 12px">
-                  <div class="progress-bar-fill ${cls}" style="width:${score}%"></div>
-                </div>
-                <span class="text-sm font-medium">${score}%</span>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Nova Visita -->
-    <div class="modal-overlay" id="modal-review">
-      <div class="modal-box modal-lg">
-        <div class="modal-header">
-          <h3>Nova Visita de Supervisor</h3>
-          <button class="btn-icon" onclick="closeModal('modal-review')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </div>
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Data da Visita</label>
-              <input type="date" id="review-date" class="input" value="${new Date().toISOString().split('T')[0]}">
-            </div>
-            <div class="form-group">
-              <label>Supervisor</label>
-              <input type="text" id="review-supervisor" class="input" placeholder="Nome do supervisor">
-            </div>
-          </div>
-          <div class="checklist">
-            <h4 class="checklist-title">Avaliação por Ponto</h4>
-            ${checklistItems.map(item => `
-              <div class="checklist-item">
-                <div class="checklist-info">
-                  <span class="badge badge-gray checklist-cat">${item.category}</span>
-                  <span>${item.label}</span>
-                </div>
-                <div class="checklist-rating">
-                  ${[1,2,3,4,5].map(n => `
-                    <button class="rating-btn" data-item="${item.id}" data-val="${n}" onclick="setRating('${item.id}', ${n})">${n}</button>
-                  `).join('')}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-          <div class="form-group" style="margin-top:16px">
-            <label>Comentários Gerais</label>
-            <textarea id="review-comments" class="input textarea" placeholder="Observações da visita..."></textarea>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <span id="review-score-preview" class="text-muted">Score: —</span>
-          <button class="btn btn-outline" onclick="closeModal('modal-review')">Cancelar</button>
-          <button class="btn btn-primary" onclick="saveReview()">Guardar Visita</button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  populateStoreSelectors();
-  window.openNewReview = () => Modal.open('modal-review');
-  window.closeModal = (id) => Modal.close(id);
-  window.ratings = {};
-  window.setRating = (itemId, val) => {
-    window.ratings[itemId] = val;
-    document.querySelectorAll(`[data-item="${itemId}"]`).forEach(btn => {
-      btn.classList.toggle('rating-active', parseInt(btn.dataset.val) <= val);
-    });
-    const vals = Object.values(window.ratings);
-    const avg = vals.length ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 20) : 0;
-    document.getElementById('review-score-preview').textContent = `Score estimado: ${avg}/100`;
-  };
-  window.saveReview = () => {
-    Toast.success('Visita guardada com sucesso!');
-    Modal.close('modal-review');
-  };
-}
-
-/* ============================================================
-   MÓDULO: ADMINISTRAÇÃO
-   ============================================================ */
-async function renderAdmin(container) {
-  container.innerHTML = `
-    <div class="module-header">
-      <div class="module-header-left">
-        <h2>Administração</h2>
-        <p class="text-muted">Configuração do sistema</p>
-      </div>
-    </div>
-
-    <div class="admin-grid">
-      <div class="card">
-        <div class="card-header"><h3>Lojas</h3></div>
-        <div class="stores-list">
-          ${State.stores.map(s => `
-            <div class="store-row">
-              <div class="store-badge store-badge-sm">${s.id}</div>
-              <div class="store-row-info">
-                <span class="font-medium">${s.name}</span>
-                <span class="text-muted text-sm">${s.city} · ${s.area}m²</span>
-              </div>
-              <span class="badge ${s.active ? 'badge-success' : 'badge-gray'}">${s.active ? 'Ativa' : 'Inativa'}</span>
-              <button class="btn-icon btn-icon-sm" title="Editar">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              </button>
-            </div>
-          `).join('')}
-        </div>
-        <div class="card-footer">
-          <button class="btn btn-sm btn-outline btn-full">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Adicionar Loja
-          </button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><h3>Supervisores</h3></div>
-        <div class="supervisors-list">
-          ${['Ana Silva', 'Pedro Mendes', 'Luís Rocha'].map(name => `
-            <div class="supervisor-row">
-              <span class="emp-avatar">${name[0]}</span>
-              <span>${name}</span>
-              <span class="badge badge-blue">Supervisor</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><h3>Cache & Sistema</h3></div>
-        <div class="admin-actions">
-          <div class="admin-action-row">
-            <div>
-              <div class="font-medium">Limpar cache local</div>
-              <div class="text-muted text-sm">Remove dados em cache. Próxima visita irá buscar dados frescos.</div>
-            </div>
-            <button class="btn btn-sm btn-outline" onclick="clearCache()">Limpar</button>
-          </div>
-          <div class="admin-action-row">
-            <div>
-              <div class="font-medium">Inserir dados demo</div>
-              <div class="text-muted text-sm">Popula o Firebase com dados de exemplo para testes.</div>
-            </div>
-            <button class="btn btn-sm btn-warning" onclick="runSeed()">Seed</button>
-          </div>
-          <div class="admin-action-row">
-            <div>
-              <div class="font-medium">Exportar configuração</div>
-              <div class="text-muted text-sm">Exporta configuração completa em JSON.</div>
-            </div>
-            <button class="btn btn-sm btn-outline" onclick="exportConfig()">Exportar</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><h3>Sobre o Sistema</h3></div>
-        <div class="about-list">
-          <div class="about-row"><span>Versão</span><span class="font-medium">1.0.0</span></div>
-          <div class="about-row"><span>Lojas configuradas</span><span class="font-medium">${State.stores.length}</span></div>
-          <div class="about-row"><span>Entradas em cache</span><span class="font-medium" id="cache-count">—</span></div>
-          <div class="about-row"><span>Estado</span><span class="badge ${State.offline ? 'badge-warning' : 'badge-success'}">${State.offline ? 'Offline' : 'Online'}</span></div>
-          <div class="about-row"><span>PWA</span><span class="badge badge-success">Instalável</span></div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  document.getElementById('cache-count').textContent = Cache.size();
-
-  window.clearCache = () => {
-    Modal.confirm('Limpar Cache', 'Tem a certeza que quer limpar toda a cache local?', () => {
-      Cache.clear();
-      Toast.success('Cache limpa com sucesso!');
-      document.getElementById('cache-count').textContent = '0';
-    });
-  };
-
-  window.runSeed = async () => {
+function handleUpload(input) {
+  const file = input.files[0]; if (!file) return;
+  const st = document.getElementById('upst'); if(st){st.textContent='A processar...';st.className='upst';}
+  const reader = new FileReader();
+  reader.onload = ev => {
     try {
-      Loading.showOverlay('A inserir dados demo...');
-      await seedDemoData();
-      await loadStores();
-      Toast.success('Dados demo inseridos!');
-    } catch (e) {
-      Toast.error('Erro ao inserir dados. Configure o Firebase primeiro.');
-    } finally {
-      Loading.hideOverlay();
-    }
+      const wb = XLSX.read(ev.target.result, { type:'array', cellDates:true });
+      const _pd = v => { if(!v)return null; if(v instanceof Date)return v.toISOString().split('T')[0]; return String(v).split('T')[0]; };
+      const _dtm = v => { if(!v||isNaN(v))return''; const h=v*24,hh=Math.floor(h)%24,mm=Math.floor((h-Math.floor(h))*60); return String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0'); };
+      const ups = (code,date,fields) => { if(!APP.DB[code]||!date)return; let r=APP.DB[code].r.find(x=>x.d===date); if(!r){r={d:date,vs:null,ru:null,cl:null,tk:null,vp:null,h1:'',hu:'',hl:null,hp:null};APP.DB[code].r.push(r);} Object.assign(r,fields); };
+      // SalesKPIsStore
+      const w1 = wb.Sheets['SalesKPIsStore'];
+      if (w1) { const raw=XLSX.utils.sheet_to_json(w1,{header:1,defval:null}),h=raw[1]||[]; const iD=h.findIndex(x=>x&&String(x).includes('Date')),iC=h.findIndex(x=>x&&String(x).includes('Nro Centro')),iV=h.findIndex(x=>x&&String(x).includes('Vendas_Liquidas')),iT=h.findIndex(x=>x&&String(x).includes('Ticket')),iCl=h.findIndex(x=>x&&String(x).includes('Clientes')); for(let i=2;i<raw.length;i++){const r=raw[i],ds=_pd(r[iD]);if(!ds)continue;ups(String(r[iC]||'').trim(),ds,{vs:r[iV]?Math.round(+r[iV]):null,tk:r[iT]?Math.round(+r[iT]):null,cl:r[iCl]?Math.round(+r[iCl]):null});} }
+      // RuturaLojaseCDs
+      const w2 = wb.Sheets['RuturaLojaseCDs'];
+      if (w2) { const raw=XLSX.utils.sheet_to_json(w2,{header:1,defval:null}),h=raw[1]||[]; const iC=h.findIndex(x=>x&&String(x).includes('centro')),iD=h.findIndex(x=>x&&String(x).includes('Data')),iR=h.findIndex(x=>x&&String(x).includes('SumResp')); for(let i=2;i<raw.length;i++){const r=raw[i],ds=_pd(r[iD]);if(!ds)continue;ups(r[iC],ds,{ru:r[iR]!=null?Math.round(+r[iR]*10000)/100:null});} }
+      // PAO (3)
+      const w3 = wb.Sheets['PAO (3)'];
+      if (w3) { const raw=XLSX.utils.sheet_to_json(w3,{header:1,defval:null}),h=raw[0]||[]; const iC=h.indexOf('CENTRO'),iD=h.indexOf('DATA'),iQ=h.indexOf('QUANTIDADE'),iUG=h.indexOf('PTALAO_P'),iUP=h.indexOf('UTALAO_P'); for(let i=1;i<raw.length;i++){const r=raw[i],ds=_pd(r[iD]);if(!ds)continue;ups(r[iC],ds,{vp:r[iQ]?Math.round(+r[iQ]):null,h1:_dtm(r[iUG]),hu:_dtm(r[iUP])});} }
+      // Downtime
+      const w4 = wb.Sheets['Downtime'];
+      if (w4) { const raw=XLSX.utils.sheet_to_json(w4,{header:1,defval:null}),h=raw[0]||[]; const iC=h.findIndex(x=>x&&String(x).includes('Nro Centro')),iD=h.findIndex(x=>x&&String(x).includes('Data da informa')),iHL=h.findIndex(x=>x&&String(x).includes('fecho de Loja')),iHP=h.findIndex(x=>x&&String(x).includes('Fecho Padaria')); for(let i=1;i<raw.length;i++){const r=raw[i],ds=_pd(r[iD]);if(!ds)continue;ups(r[iC],ds,{hl:r[iHL]!=null?+r[iHL]:null,hp:r[iHP]!=null?+r[iHP]:null});} }
+      if(st){st.textContent='✓ Actualizado';st.className='upst ok';setTimeout(()=>{st.textContent='';st.className='upst';},4000);}
+      if(APP.AS) renderTable();
+    } catch(err) { if(st){st.textContent='Erro: '+err.message;st.className='upst err';} console.error(err); }
   };
-
-  window.exportConfig = () => {
-    const config = { stores: State.stores, exportedAt: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `karta_config_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    Toast.success('Configuração exportada!');
-  };
+  reader.readAsArrayBuffer(file); input.value='';
 }
 
-/* ============================================================
-   HELPERS
-   ============================================================ */
-function setupSidebar() {
-  const toggle = document.getElementById('sidebar-toggle');
-  const sidebar = document.getElementById('sidebar');
-  const overlay = document.getElementById('sidebar-overlay');
-
-  toggle?.addEventListener('click', () => {
-    sidebar?.classList.toggle('sidebar-open');
-    overlay?.classList.toggle('active');
-  });
-  overlay?.addEventListener('click', () => {
-    sidebar?.classList.remove('sidebar-open');
-    overlay?.classList.remove('active');
+function _filterSidebar(q) {
+  q = (q||'').toLowerCase();
+  const mes = APP.TODAY.substring(0,7);
+  document.querySelectorAll('#sbn .nav-item').forEach(el => {
+    const code=(el.querySelector('.nav-code')||{}).textContent||'';
+    const name=(el.querySelector('.nav-name')||{}).textContent||'';
+    if (!_isLojaActiva(code,mes)){el.style.display='none';return;}
+    el.style.display = !q||code.toLowerCase().includes(q)||name.toLowerCase().includes(q) ? '' : 'none';
   });
 }
 
-function showUpdateBanner() {
-  const banner = document.createElement('div');
-  banner.className = 'update-banner';
-  banner.innerHTML = `
-    <span>Nova versão disponível!</span>
-    <button onclick="window.location.reload()">Atualizar</button>
-  `;
-  document.body.appendChild(banner);
-}
-
-function showOfflineBanner() {
-  if (document.getElementById('offline-banner')) return;
-  const banner = document.createElement('div');
-  banner.id = 'offline-banner';
-  banner.className = 'offline-banner';
-  banner.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.56 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01"/></svg> Sem ligação — modo offline`;
-  document.body.appendChild(banner);
-}
-
-/* ============================================================
-   BOOTSTRAP
-   ============================================================ */
+// ── Boot ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', init);
+// Expor funções necessárias globalmente
+window.renderTable     = renderTable;
+window.filterTable     = filterTable;
+window.exportCSV       = exportCSV;
+window.loadForm        = loadForm;
+window.handleUpload    = handleUpload;
+window.scrollToToday   = scrollToToday;

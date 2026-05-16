@@ -1,420 +1,207 @@
 /* ============================================================
    Karta · Retail Intelligence — UI Module
-   ============================================================
-   - Toast notifications
-   - Loading states
-   - Modal system
-   - Format utilities
-   - Chart helpers
    ============================================================ */
 
-/* ============================================================
-   FORMAT UTILITIES
-   ============================================================ */
+/* ── Formatters ─────────────────────────────────────────────── */
 export const Fmt = {
-  currency(value, currency = 'AOA') {
-    if (value == null || isNaN(value)) return '—';
-    if (value >= 1_000_000) {
-      return `${(value / 1_000_000).toFixed(1)}M Kz`;
-    }
-    if (value >= 1_000) {
-      return `${(value / 1_000).toFixed(0)}K Kz`;
-    }
-    return `${Math.round(value).toLocaleString('pt-AO')} Kz`;
+  n: (v, d=0) => (v == null || isNaN(v)) ? '—' : Number(v).toLocaleString('pt-AO', { minimumFractionDigits: d, maximumFractionDigits: d }),
+  kz: v => {
+    if (v == null || isNaN(v)) return '—';
+    if (Math.abs(v) >= 1e9) return (v/1e9).toFixed(2) + ' B Kz';
+    if (Math.abs(v) >= 1e6) return (v/1e6).toFixed(1) + ' M Kz';
+    if (Math.abs(v) >= 1e3) return (v/1e3).toFixed(0) + ' k Kz';
+    return Math.round(v).toLocaleString('pt-AO') + ' Kz';
   },
-
-  number(value, decimals = 0) {
-    if (value == null || isNaN(value)) return '—';
-    return Number(value).toLocaleString('pt-PT', {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals
-    });
-  },
-
-  percent(value, decimals = 1) {
-    if (value == null || isNaN(value)) return '—';
-    const sign = value > 0 ? '+' : '';
-    return `${sign}${Number(value).toFixed(decimals)}%`;
-  },
-
-  date(date, format = 'short') {
-    if (!date) return '—';
-    const d = date?.toDate ? date.toDate() : new Date(date);
-    if (format === 'short') return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' });
-    if (format === 'medium') return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' });
-    if (format === 'long') return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' });
-    if (format === 'monthYear') return d.toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' });
+  pct: (v, d=1) => (v == null || isNaN(v)) ? '—' : (v >= 0 ? '+' : '') + Number(v).toFixed(d) + '%',
+  pctAbs: (v, d=2) => (v == null || isNaN(v)) ? '—' : Number(v).toFixed(d) + '%',
+  date: (v, fmt='medium') => {
+    if (!v) return '—';
+    const d = v?.toDate ? v.toDate() : new Date(v);
+    if (fmt === 'short')     return d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' });
+    if (fmt === 'medium')    return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'short' });
+    if (fmt === 'long')      return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' });
+    if (fmt === 'monthYear') return d.toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' });
     return d.toLocaleDateString('pt-PT');
   },
-
-  dateInput(date) {
-    const d = date?.toDate ? date.toDate() : new Date(date);
-    return d.toISOString().split('T')[0];
-  },
-
-  relativeDelta(current, previous) {
-    if (!previous || previous === 0) return null;
-    return ((current - previous) / previous) * 100;
-  }
+  delta: (cur, prev) => (!prev || prev === 0) ? null : ((cur - prev) / prev) * 100,
+  time: t => t || '—',
 };
 
-/* ============================================================
-   TOAST NOTIFICATIONS
-   ============================================================ */
-let toastContainer;
+/* ── Badge helpers ───────────────────────────────────────────── */
+export const bdg = (t, cls) => `<span class="bdg ${cls}">${t}</span>`;
+export const pctBdg = v => v >= .9 ? bdg(Fmt.pctAbs(v*100) + '%', 'b-g') : v >= .7 ? bdg(Fmt.pctAbs(v*100) + '%', 'b-a') : bdg(Fmt.pctAbs(v*100) + '%', 'b-r');
+export const rutBdg = v => v == null ? '—' : v <= 1.5 ? bdg(Fmt.pctAbs(v) + '%', 'b-g') : v <= 3 ? bdg(Fmt.pctAbs(v) + '%', 'b-a') : bdg(Fmt.pctAbs(v) + '%', 'b-r');
+export const dlBdg  = v => v === 0 ? bdg('0h', 'b-g') : v < 20 ? bdg(v + 'h', 'b-a') : bdg(v + 'h', 'b-r');
+export const dpBdg  = v => v === 0 ? bdg('0h', 'b-g') : v < 50 ? bdg(v + 'h', 'b-a') : bdg(v + 'h', 'b-r');
 
-function getToastContainer() {
-  if (!toastContainer) {
-    toastContainer = document.getElementById('toast-container');
-    if (!toastContainer) {
-      toastContainer = document.createElement('div');
-      toastContainer.id = 'toast-container';
-      document.body.appendChild(toastContainer);
-    }
-  }
-  return toastContainer;
+/* ── aCard (análise card com barra de cor) ───────────────────── */
+export function aCard(label, value, sub, colorClass) {
+  return `<div class="acard ${colorClass||''}">
+    <div class="acl">${label}</div>
+    <div class="acv">${value}</div>
+    ${sub ? `<div class="acs">${sub}</div>` : ''}
+  </div>`;
 }
+
+/* ── bRow (barra horizontal em panels) ──────────────────────── */
+export function bRow(lbl, val, max, color, valStr, wide) {
+  const pct = max > 0 ? Math.max(1, val/max*100) : 0;
+  return `<div class="brow">
+    <div class="blbl${wide?' w':''}" title="${lbl}">${lbl}</div>
+    <div class="btrack"><div class="bfill" style="width:${pct.toFixed(1)}%;background:${color}"></div></div>
+    <div class="bval">${valStr}</div>
+  </div>`;
+}
+
+/* ── Toast ───────────────────────────────────────────────────── */
+let _toastContainer;
+function _getToasts() {
+  if (!_toastContainer) {
+    _toastContainer = document.getElementById('toast-container');
+    if (!_toastContainer) { _toastContainer = document.createElement('div'); _toastContainer.id = 'toast-container'; document.body.appendChild(_toastContainer); }
+  }
+  return _toastContainer;
+}
+
+const _ICONS = {
+  success: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`,
+  error:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+  warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  info:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+};
 
 export const Toast = {
-  show(message, type = 'info', duration = 4000) {
-    const container = getToastContainer();
-    const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
-
-    const icons = {
-      success: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`,
-      error: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
-      warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-      info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
-    };
-
-    toast.innerHTML = `
-      <span class="toast-icon">${icons[type] || icons.info}</span>
-      <span class="toast-message">${message}</span>
-      <button class="toast-close" onclick="this.parentElement.remove()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    `;
-
-    container.appendChild(toast);
-    requestAnimationFrame(() => toast.classList.add('toast-visible'));
-
-    if (duration > 0) {
-      setTimeout(() => {
-        toast.classList.remove('toast-visible');
-        setTimeout(() => toast.remove(), 350);
-      }, duration);
-    }
-
-    return toast;
+  show(msg, type='info', duration=4000) {
+    const c = _getToasts();
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.innerHTML = `<span class="toast-icon">${_ICONS[type]||_ICONS.info}</span><span class="toast-msg">${msg}</span><button class="toast-x" onclick="this.parentElement.remove()">✕</button>`;
+    c.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('toast-in'));
+    if (duration > 0) setTimeout(() => { t.classList.remove('toast-in'); setTimeout(() => t.remove(), 320); }, duration);
+    return t;
   },
-
-  success: (msg, d) => Toast.show(msg, 'success', d),
-  error: (msg, d) => Toast.show(msg, 'error', d),
-  warning: (msg, d) => Toast.show(msg, 'warning', d),
-  info: (msg, d) => Toast.show(msg, 'info', d),
+  success: (m,d) => Toast.show(m,'success',d),
+  error:   (m,d) => Toast.show(m,'error',d),
+  warning: (m,d) => Toast.show(m,'warning',d),
+  info:    (m,d) => Toast.show(m,'info',d),
 };
 
-/* ============================================================
-   LOADING STATES
-   ============================================================ */
+/* ── Loading ─────────────────────────────────────────────────── */
 export const Loading = {
-  show(container, message = 'A carregar...') {
-    if (!container) return;
-    container.innerHTML = `
-      <div class="loading-state">
-        <div class="loading-spinner"></div>
-        <p>${message}</p>
-      </div>
-    `;
+  show(el, msg='A carregar…') {
+    if (!el) return;
+    el.innerHTML = `<div class="empty"><div class="loading-spin"></div><p>${msg}</p></div>`;
   },
-
-  showOverlay(message = 'A processar...') {
-    let overlay = document.getElementById('loading-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'loading-overlay';
-      overlay.innerHTML = `
-        <div class="loading-overlay-inner">
-          <div class="loading-spinner loading-spinner-lg"></div>
-          <p id="loading-overlay-msg">${message}</p>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-    } else {
-      document.getElementById('loading-overlay-msg').textContent = message;
-    }
-    overlay.classList.add('active');
+  showOverlay(msg='A processar…') {
+    let o = document.getElementById('loading-overlay');
+    if (!o) { o = document.createElement('div'); o.id='loading-overlay'; o.innerHTML=`<div class="loading-inner"><div class="loading-spin lg"></div><p id="loading-msg"></p></div>`; document.body.appendChild(o); }
+    document.getElementById('loading-msg').textContent = msg;
+    o.classList.add('active');
   },
-
-  hideOverlay() {
-    const overlay = document.getElementById('loading-overlay');
-    if (overlay) overlay.classList.remove('active');
+  hideOverlay() { document.getElementById('loading-overlay')?.classList.remove('active'); },
+  showError(el, msg='Erro ao carregar.', onRetry) {
+    if (!el) return;
+    el.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" width="32" fill="none" stroke="var(--red)" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><p style="color:var(--t2)">${msg}</p>${onRetry?`<button class="bsave" style="margin-top:8px" onclick="(${onRetry.toString()})()">Tentar novamente</button>`:''}</div>`;
   },
-
-  showError(container, message = 'Erro ao carregar dados.', onRetry) {
-    if (!container) return;
-    container.innerHTML = `
-      <div class="error-state">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="8" x2="12" y2="12"/>
-          <line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        <p>${message}</p>
-        ${onRetry ? `<button class="btn btn-sm btn-outline" onclick="(${onRetry.toString()})()">Tentar novamente</button>` : ''}
-      </div>
-    `;
+  showEmpty(el, msg='Sem dados.') {
+    if (!el) return;
+    el.innerHTML = `<div class="empty"><p style="color:var(--t3)">${msg}</p></div>`;
   },
-
-  showEmpty(container, message = 'Sem dados disponíveis.', icon = '') {
-    if (!container) return;
-    container.innerHTML = `
-      <div class="empty-state">
-        ${icon ? `<div class="empty-icon">${icon}</div>` : ''}
-        <p>${message}</p>
-      </div>
-    `;
-  }
 };
 
-/* ============================================================
-   MODAL SYSTEM
-   ============================================================ */
+/* ── Modal ───────────────────────────────────────────────────── */
 export const Modal = {
-  activeModal: null,
-
   open(id) {
-    const modal = document.getElementById(id);
-    if (!modal) return;
-    modal.classList.add('modal-active');
+    const m = document.getElementById(id); if (!m) return;
+    m.style.display = 'flex';
+    requestAnimationFrame(() => m.classList.add('modal-in'));
     document.body.classList.add('modal-open');
-    Modal.activeModal = modal;
-
-    // Fechar ao clicar fora
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) Modal.close(id);
-    }, { once: true });
+    m.addEventListener('click', e => { if (e.target === m) Modal.close(id); }, { once: true });
   },
-
   close(id) {
-    const modal = id ? document.getElementById(id) : Modal.activeModal;
-    if (!modal) return;
-    modal.classList.remove('modal-active');
-    document.body.classList.remove('modal-open');
-    Modal.activeModal = null;
+    const m = id ? document.getElementById(id) : document.querySelector('.modal-overlay.modal-in');
+    if (!m) return;
+    m.classList.remove('modal-in');
+    setTimeout(() => { m.style.display = ''; document.body.classList.remove('modal-open'); }, 200);
   },
-
-  confirm(title, message, onConfirm, onCancel) {
-    let modal = document.getElementById('modal-confirm');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'modal-confirm';
-      modal.className = 'modal-overlay';
-      modal.innerHTML = `
-        <div class="modal-box modal-sm">
-          <div class="modal-header">
-            <h3 id="modal-confirm-title"></h3>
-          </div>
-          <div class="modal-body">
-            <p id="modal-confirm-msg"></p>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-outline" id="modal-confirm-cancel">Cancelar</button>
-            <button class="btn btn-danger" id="modal-confirm-ok">Confirmar</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
+  confirm(title, msg, onOk) {
+    let m = document.getElementById('modal-confirm');
+    if (!m) {
+      m = document.createElement('div'); m.id='modal-confirm'; m.className='modal-overlay';
+      m.innerHTML=`<div class="modal-box modal-sm"><div class="modal-hdr"><h3 id="mc-title"></h3></div><div class="modal-body"><p id="mc-msg"></p></div><div class="modal-ftr"><button class="btn-up" id="mc-cancel">Cancelar</button><button class="bsave" style="background:var(--red)" id="mc-ok">Confirmar</button></div></div>`;
+      document.body.appendChild(m);
     }
-
-    document.getElementById('modal-confirm-title').textContent = title;
-    document.getElementById('modal-confirm-msg').textContent = message;
-
-    const btnOk = document.getElementById('modal-confirm-ok');
-    const btnCancel = document.getElementById('modal-confirm-cancel');
-
-    const cleanup = () => Modal.close('modal-confirm');
-    btnOk.onclick = () => { cleanup(); onConfirm?.(); };
-    btnCancel.onclick = () => { cleanup(); onCancel?.(); };
-
+    document.getElementById('mc-title').textContent = title;
+    document.getElementById('mc-msg').textContent = msg;
+    document.getElementById('mc-ok').onclick = () => { Modal.close('modal-confirm'); onOk?.(); };
+    document.getElementById('mc-cancel').onclick = () => Modal.close('modal-confirm');
     Modal.open('modal-confirm');
-  }
+  },
 };
 
-/* ============================================================
-   KPI CARD BUILDER
-   ============================================================ */
-export function buildKPICard({ label, value, sub, trend, trendPositive, icon, color = 'blue' }) {
-  const trendClass = trend != null ? (trendPositive ? 'trend-up' : 'trend-down') : '';
-  const trendIcon = trendPositive
-    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>`
-    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>`;
-
-  return `
-    <div class="kpi-card kpi-card-${color}">
-      <div class="kpi-header">
-        <span class="kpi-label">${label}</span>
-        ${icon ? `<span class="kpi-icon">${icon}</span>` : ''}
-      </div>
-      <div class="kpi-value">${value}</div>
-      <div class="kpi-footer">
-        ${sub ? `<span class="kpi-sub">${sub}</span>` : ''}
-        ${trend != null ? `
-          <span class="kpi-trend ${trendClass}">
-            ${trendIcon}
-            ${Math.abs(trend).toFixed(1)}%
-          </span>
-        ` : ''}
-      </div>
-    </div>
-  `;
+/* ── Table filter ─────────────────────────────────────────────── */
+export function filterTable(tableEl, q) {
+  if (!tableEl) return;
+  const ql = (q||'').toLowerCase().trim();
+  tableEl.querySelectorAll('tbody tr').forEach(tr => {
+    if (tr.classList.contains('pend-loja-row')) { tr.style.display=''; return; }
+    tr.style.display = !ql || tr.textContent.toLowerCase().includes(ql) ? '' : 'none';
+  });
 }
 
-/* ============================================================
-   MINI SPARKLINE (SVG)
-   ============================================================ */
-export function buildSparkline(data, color = '#0070F3', height = 40, width = 120) {
-  if (!data?.length) return '';
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const step = width / (data.length - 1);
-
-  const points = data.map((v, i) => {
-    const x = i * step;
-    const y = height - ((v - min) / range) * height;
-    return `${x},${y}`;
-  }).join(' ');
-
-  const fillPoints = `0,${height} ${points} ${width},${height}`;
-
-  return `
-    <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="sparkline">
-      <defs>
-        <linearGradient id="spark-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
-          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      <polygon points="${fillPoints}" fill="url(#spark-grad)"/>
-      <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-  `;
-}
-
-/* ============================================================
-   PROGRESS BAR
-   ============================================================ */
-export function buildProgressBar(value, max, label, color = '#0070F3') {
-  const pct = Math.min(100, Math.round((value / max) * 100));
-  const cls = pct >= 100 ? 'progress-success' : pct >= 80 ? 'progress-warning' : 'progress-danger';
-  return `
-    <div class="progress-wrap">
-      ${label ? `<div class="progress-label"><span>${label}</span><span>${pct}%</span></div>` : ''}
-      <div class="progress-bar-track">
-        <div class="progress-bar-fill ${cls}" style="width:${pct}%"></div>
-      </div>
-    </div>
-  `;
-}
-
-/* ============================================================
-   TABLE BUILDER
-   ============================================================ */
-export function buildTable({ columns, rows, onRowClick, emptyMsg = 'Sem dados' }) {
-  if (!rows?.length) {
-    return `<div class="table-empty">${emptyMsg}</div>`;
-  }
-
-  const headers = columns.map(c => `<th>${c.label}</th>`).join('');
-  const bodyRows = rows.map((row, i) => {
-    const cells = columns.map(c => {
-      const val = typeof c.render === 'function' ? c.render(row[c.key], row) : (row[c.key] ?? '—');
-      return `<td>${val}</td>`;
-    }).join('');
-    return `<tr class="${onRowClick ? 'tr-clickable' : ''}" data-row="${i}">${cells}</tr>`;
-  }).join('');
-
-  return `
-    <div class="table-scroll">
-      <table class="data-table">
-        <thead><tr>${headers}</tr></thead>
-        <tbody>${bodyRows}</tbody>
-      </table>
-    </div>
-  `;
-}
-
-/* ============================================================
-   DEBOUNCE
-   ============================================================ */
-export function debounce(fn, delay = 400) {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), delay);
-  };
-}
-
-/* ============================================================
-   EXPORT TO EXCEL (CSV)
-   ============================================================ */
-export function exportToCSV(data, filename = 'export') {
+/* ── Export CSV ───────────────────────────────────────────────── */
+export function exportCSV(data, filename='export') {
   if (!data?.length) return;
   const keys = Object.keys(data[0]);
-  const header = keys.join(';');
-  const rows = data.map(row => keys.map(k => {
-    let val = row[k] ?? '';
-    if (typeof val === 'string' && val.includes(';')) val = `"${val}"`;
-    return val;
-  }).join(';'));
-  const csv = [header, ...rows].join('\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
+  const csv = [keys.join(';'), ...data.map(r => keys.map(k => {
+    let v = r[k] ?? ''; if (typeof v === 'string' && v.includes(';')) v = `"${v}"`;
+    return v;
+  }).join(';'))].join('\n');
   const a = document.createElement('a');
-  a.href = url;
+  a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv], { type:'text/csv;charset=utf-8;' }));
   a.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
-  URL.revokeObjectURL(url);
 }
 
-/* ============================================================
-   SEARCH FILTER
-   ============================================================ */
-export function filterTable(tableEl, query) {
-  if (!tableEl) return;
-  const rows = tableEl.querySelectorAll('tbody tr');
-  const q = query.toLowerCase().trim();
-  rows.forEach(row => {
-    const text = row.textContent.toLowerCase();
-    row.style.display = !q || text.includes(q) ? '' : 'none';
-  });
+/* ── Debounce ─────────────────────────────────────────────────── */
+export function debounce(fn, ms=400) {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
-/* ============================================================
-   INSTALL PROMPT
-   ============================================================ */
+/* ── PWA install prompt ───────────────────────────────────────── */
 export function setupInstallPrompt() {
-  let deferredPrompt;
+  let deferred;
   const btn = document.getElementById('btn-install');
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault(); deferred = e;
+    if (btn) { btn.style.display='flex'; btn.onclick = async () => { deferred.prompt(); const {outcome}=await deferred.userChoice; if(outcome==='accepted') btn.style.display='none'; deferred=null; }; }
+  });
+  window.addEventListener('appinstalled', () => { if(btn) btn.style.display='none'; Toast.success('App instalada!'); });
+}
 
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    if (btn) {
-      btn.style.display = 'flex';
-      btn.addEventListener('click', async () => {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') btn.style.display = 'none';
-        deferredPrompt = null;
-      });
+/* ── Novo deploy banner ────────────────────────────────────────── */
+export function setupUpdateBanner() {
+  window.addEventListener('message', e => {
+    if (e.data?.type === 'NEW_VERSION') {
+      const b = document.createElement('div');
+      b.className = 'update-banner';
+      b.innerHTML = `<span>Nova versão disponível!</span><button onclick="window.location.reload()">Atualizar</button>`;
+      document.body.appendChild(b);
     }
   });
+}
 
-  window.addEventListener('appinstalled', () => {
-    if (btn) btn.style.display = 'none';
-    Toast.success('App instalada com sucesso!');
-  });
+/* ── Offline banner ─────────────────────────────────────────────── */
+export function setupOfflineBanner() {
+  const show = () => {
+    if (document.getElementById('offline-banner')) return;
+    const b = document.createElement('div'); b.id='offline-banner'; b.className='offline-banner';
+    b.textContent='Sem ligação — modo offline';
+    document.body.appendChild(b);
+  };
+  const hide = () => { document.getElementById('offline-banner')?.remove(); };
+  if (!navigator.onLine) show();
+  window.addEventListener('online',  () => { hide(); Toast.success('Ligação restabelecida'); });
+  window.addEventListener('offline', () => { show(); Toast.warning('Sem ligação à internet'); });
 }

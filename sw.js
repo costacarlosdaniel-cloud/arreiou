@@ -1,87 +1,97 @@
-/* ============================================================
-   Karta · Retail Intelligence — Service Worker
-   ============================================================ */
+// ── Karta · Retail Intelligence — Service Worker ─────────────────────────────
+const CACHE_NAME = 'karta-20260516001'; // ← actualizar com cada deploy
 
-const CACHE_NAME = 'karta-v1.0.0';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/app.js',
-  '/firebase.js',
-  '/ui.js',
-  '/manifest.json',
-  'https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Mono:wght@400;500&display=swap',
+const CACHEABLE_CDN = [
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+  'https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap',
 ];
 
-/* ---------- Install ---------- */
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS.filter(url => !url.startsWith('https://fonts')));
-    }).then(() => self.skipWaiting())
+self.addEventListener('install', function(e) {
+  self.skipWaiting();
+  e.waitUntil(
+    caches.open(CACHE_NAME).then(function(cache) {
+      return Promise.all([
+        cache.add('/index.html').catch(function() {}),
+        cache.addAll(CACHEABLE_CDN).catch(function() {})
+      ]);
+    })
   );
 });
 
-/* ---------- Activate ---------- */
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => {
+self.addEventListener('activate', function(e) {
+  e.waitUntil(
+    caches.keys().then(function(keys) {
       return Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+        keys.filter(function(k) { return k !== CACHE_NAME; })
+            .map(function(k) { return caches.delete(k); })
       );
-    }).then(() => self.clients.claim())
-  );
-});
-
-/* ---------- Fetch ---------- */
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
-
-  // Skip Firebase, APIs, and non-GET
-  if (request.method !== 'GET') return;
-  if (url.hostname.includes('firestore') || url.hostname.includes('firebase')) return;
-  if (url.hostname.includes('googleapis') && !url.hostname.includes('fonts')) return;
-
-  // Network first for HTML (garantir versão mais recente)
-  if (request.headers.get('accept')?.includes('text/html')) {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
-
-  // Cache first para assets estáticos
-  event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) return cached;
-      return fetch(request).then(response => {
-        if (response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-        }
-        return response;
-      }).catch(() => {
-        // Offline fallback
-        if (request.headers.get('accept')?.includes('image')) {
-          return new Response('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="#f0f0f0" width="100" height="100"/></svg>',
-            { headers: { 'Content-Type': 'image/svg+xml' } });
-        }
+    }).then(function() {
+      return self.clients.claim();
+    }).then(function() {
+      return self.clients.matchAll({ type: 'window' }).then(function(clients) {
+        clients.forEach(function(client) {
+          client.postMessage({ type: 'NEW_VERSION' });
+        });
       });
     })
   );
 });
 
-/* ---------- Push / Background Sync (preparado) ---------- */
-self.addEventListener('message', (event) => {
-  if (event.data?.type === 'SKIP_WAITING') {
-    self.skipWaiting();
+self.addEventListener('fetch', function(e) {
+  var url = e.request.url;
+  var method = e.request.method;
+
+  if (method !== 'GET' ||
+      url.includes('firebaseio.com') ||
+      url.includes('googleapis.com/spreadsheets') ||
+      url.includes('docs.google.com') ||
+      url.includes('gstatic.com/firebasejs') ||
+      url.includes('anthropic.com') ||
+      url.includes('firestore.googleapis.com')) {
+    return;
   }
+
+  // index.html: network-first, fallback cache offline
+  if (url.endsWith('/') || url.endsWith('/index.html') || e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request, { cache: 'no-store' })
+        .then(function(r) {
+          var clone = r.clone();
+          caches.open(CACHE_NAME).then(function(c) { c.put(e.request, clone); });
+          return r;
+        })
+        .catch(function() { return caches.match('/index.html'); })
+    );
+    return;
+  }
+
+  // Libs CDN: cache-first
+  if (url.includes('cdnjs.cloudflare.com') ||
+      url.includes('fonts.googleapis.com') ||
+      url.includes('fonts.gstatic.com')) {
+    e.respondWith(
+      caches.match(e.request).then(function(cached) {
+        if (cached) return cached;
+        return fetch(e.request).then(function(r) {
+          if (r && r.status === 200) {
+            var clone = r.clone();
+            caches.open(CACHE_NAME).then(function(c) { c.put(e.request, clone); });
+          }
+          return r;
+        }).catch(function() { return cached; });
+      })
+    );
+    return;
+  }
+
+  // Resto: network, fallback cache
+  e.respondWith(
+    fetch(e.request, { cache: 'no-store' }).catch(function() {
+      return caches.match(e.request);
+    })
+  );
+});
+
+self.addEventListener('message', function(e) {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
