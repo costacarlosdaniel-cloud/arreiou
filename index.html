@@ -1066,6 +1066,11 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
             <h1><em>Calendário</em></h1>
             <p>Toque num dia para ver o detalhe.</p>
           </div>
+          <div class="ph-r">
+            <button class="btn btn-gold" onclick="copiarAgendaWhatsApp()">
+              <i class="ti ti-copy"></i> Copiar Agenda
+            </button>
+          </div>
         </div>
         <div class="card">
           <div class="card-bd" style="padding:14px;">
@@ -1078,6 +1083,9 @@ hr.sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
               <div style="display:flex;gap:12px;align-items:center;font-size:11px;color:var(--muted);">
                 <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--blue);display:inline-block;"></span>Visita</span>
                 <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block;"></span>Folga</span>
+                <button class="btn btn-gold btn-sm" onclick="copiarAgendaWhatsApp()" style="margin-left:12px;">
+                  <i class="ti ti-copy"></i> Copiar texto
+                </button>
               </div>
             </div>
             <div class="cal-grid" id="cal-cab"></div>
@@ -2780,6 +2788,95 @@ window.exportarAgenda    = exportarAgenda;
 window.preencherFiltroSup= preencherFiltroSup;
 window.toggleChecklist   = toggleChecklist;
 window.toast             = toast;
+
+function copiarAgendaWhatsApp(){
+  try{
+    const meses=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const diasSemana=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+
+    const ref = (typeof calData !== 'undefined' && calData) ? calData : new Date();
+    const m = ref.getMonth();
+    const a = ref.getFullYear();
+
+    const agendaMes = (DB.agenda || []).filter(v=>{
+      if(!v || !v.data) return false;
+      const d = new Date(v.data + 'T00:00:00');
+      return d.getMonth() === m && d.getFullYear() === a;
+    }).sort((x,y)=>String(x.data).localeCompare(String(y.data)));
+
+    let texto = `📅 OPERAÇÃO 360 — AGENDA MENSAL\n${meses[m].toUpperCase()} ${a}\n\n`;
+
+    if(!agendaMes.length){
+      texto += 'Sem agenda gerada para este mês.';
+    } else {
+      agendaMes.forEach(v=>{
+        const d = new Date(v.data + 'T00:00:00');
+        const dd = String(d.getDate()).padStart(2,'0');
+        const mm = String(d.getMonth()+1).padStart(2,'0');
+
+        texto += `${dd}/${mm} — ${diasSemana[d.getDay()]}\n`;
+
+        if(v.folga){
+          texto += `• Folga\n\n`;
+          return;
+        }
+
+        const lojas = Array.isArray(v.lojas) ? v.lojas : [];
+        const op1 = v.op1Nome || v.operador1 || v.op1 || '';
+        const op2 = v.op2Nome || v.operador2 || v.op2 || '';
+
+        if(op1 || op2){
+          texto += `Equipa: ${[op1,op2].filter(Boolean).join(' + ')}\n`;
+        }
+
+        if(lojas.length){
+          lojas.forEach(loja=>{
+            if(typeof loja === 'string'){
+              texto += `• ${loja}\n`;
+            }else if(loja && typeof loja === 'object'){
+              texto += `• ${loja.codigo || loja.cod || loja.loja || loja.nome || JSON.stringify(loja)}\n`;
+            }
+          });
+        }else if(v.loja){
+          texto += `• ${v.loja}\n`;
+        }else{
+          texto += `• Sem lojas atribuídas\n`;
+        }
+
+        texto += '\n';
+      });
+    }
+
+    const copiar = async () => {
+      if(navigator.clipboard && window.isSecureContext){
+        await navigator.clipboard.writeText(texto);
+      }else{
+        const ta=document.createElement('textarea');
+        ta.value=texto;
+        ta.setAttribute('readonly','');
+        ta.style.position='fixed';
+        ta.style.left='-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    };
+
+    copiar().then(()=>{
+      if(window.toast) toast('Listagem em texto copiada','ok');
+      else alert('Listagem em texto copiada!');
+    }).catch(()=>{
+      alert(texto);
+    });
+
+  }catch(e){
+    console.error(e);
+    alert('Erro ao copiar listagem em texto.');
+  }
+}
+
+window.copiarAgendaWhatsApp = copiarAgendaWhatsApp;
 </script>
 </body>
 </html>
