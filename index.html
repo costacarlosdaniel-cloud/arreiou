@@ -1714,12 +1714,54 @@ function preencherOp(uid,q){
   const valAtual=document.getElementById('val-'+uid)?.value||'';
   const t=q.trim().toLowerCase();
   const ops=t?DB.operadores.filter(o=>o.nome.toLowerCase().includes(t)||o.id.includes(t)):DB.operadores;
-  if(!ops.length){lista.innerHTML=`<div class="op-empty">Nenhum resultado para "${q}"</div>`;return;}
-  lista.innerHTML=ops.slice(0,100).map(o=>`
+
+  let manualHTML='';
+  if(t){
+    manualHTML=`
+      <div class="op-item" onclick="selecionarManual('${uid}','${q.replace(/'/g,"\\'")}')"
+           style="background:#E8F1FD;border-bottom:1px solid #D6E4F0;">
+        <span class="op-item-name">
+          <i class="ti ti-pencil" style="margin-right:6px;"></i>
+          Inserir manualmente: "${q}"
+        </span>
+        <span class="op-item-id">MANUAL</span>
+      </div>`;
+  }
+
+  if(!ops.length){
+    lista.innerHTML=manualHTML+`<div class="op-empty">Nenhum operador encontrado</div>`;
+    return;
+  }
+
+  lista.innerHTML=manualHTML+ops.slice(0,100).map(o=>`
     <div class="op-item${o.id===valAtual?' sel':''}" data-selecionar-op="${uid}" data-op-id="${o.id}">
       <span class="op-item-name">${dest(toTitle(o.nome),t)}</span>
       <span class="op-item-id">${dest(o.id,t)}</span>
     </div>`).join('')+(ops.length>100?`<div class="op-empty">+${ops.length-100} — refine a pesquisa</div>`:'');
+}
+
+function selecionarManual(uid,nome){
+  document.getElementById('val-'+uid).value='MANUAL_'+Date.now();
+
+  const disp=document.getElementById('disp-'+uid);
+  disp.textContent=nome;
+  disp.classList.remove('ph');
+
+  const num=document.getElementById('num-'+uid);
+  num.style.display='inline-flex';
+  num.textContent='MANUAL';
+
+  document.getElementById('clr-'+uid).classList.add('vis');
+
+  if(_opCB[uid]){
+    _opCB[uid]({
+      id:'MANUAL_'+Date.now(),
+      nome:nome,
+      manual:true
+    });
+  }
+
+  fecharOp(uid);
 }
 
 function dest(txt,t){
