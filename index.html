@@ -1909,6 +1909,7 @@ function removerEquipa(i){
   APP.equipas.splice(i,1);
   gravar();renderEquipas();
   toast('Equipa removida.','info');
+}
 
 /* Modal para criar/editar equipa */
 let _eqIdx=-1, _eqSups=[];
@@ -1957,6 +1958,7 @@ function guardarEquipa(){
   document.getElementById('eq-modal').style.display='none';
   renderEquipas();
   toast(_eqIdx===-1?'Equipa criada.':'Equipa atualizada.','ok');
+}
 
 /* Descobrir a que equipa pertence um supervisor */
 function getEquipaDe(sup){
@@ -2659,6 +2661,25 @@ function verificarPinInicial(){
   }
 }
 
+
+/* ════════════════════════════════════════
+   COMPATIBILIDADE — funções chamadas no HTML/exports antigos
+════════════════════════════════════════ */
+function calAnterior(){ calMover(-1); }
+function calSeguinte(){ calMover(1); }
+function pinSaltarAba(){
+  const ls=document.getElementById('lock-screen');
+  if(ls){ ls.classList.add('hide'); setTimeout(()=>{ls.style.display='none';},250); }
+  _pinBuf='';
+  if(typeof _pendingTab!=='undefined' && _pendingTab){ _pendingTab=null; }
+}
+function salvarSel(){
+  if(typeof atualizarPares==='function') atualizarPares();
+  if(typeof gravar==='function') gravar(true);
+  if(typeof toast==='function') toast('Seleção guardada.','ok');
+}
+function abrirSel(){ renderSel(); }
+function fecharSel(){ fecharTodosOp(); }
 
 /* ════════════════════════════════════════
    EXPOSE — module vars para onclick inline
