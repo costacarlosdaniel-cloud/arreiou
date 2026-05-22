@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Guias de Remessa · Arreiou</title>
+<meta name="theme-color" content="#0d0f18">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ══════════════════════════ TOKENS ══════════════════════════ */
+:root {
+  --bg:       #0d0f18;
+  --s1:       #131620;
+  --s2:       #1a1e2e;
+  --s3:       #222740;
+  --bd:       #2a3050;
+  --bd2:      #3a4468;
+  --tx:       #e8eaf2;
+  --t2:       #a0a8c8;
+  --t3:       #5a6285;
+  --acc:      #4f7eff;
+  --acc2:     #00d4aa;
+  --red:      #ff4d5e;
+  --warn:     #ffaa00;
+  --mono:     'JetBrains Mono', monospace;
+  --serif:    'Instrument Serif', serif;
+  --sans:     'Plus Jakarta Sans', sans-serif;
+  --r:        10px;
+  --r2:       6px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--tx);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ══════════════════════════ TOPBAR ══════════════════════════ */
+#topbar {
+  height: 52px;
+  background: var(--s1);
+  border-bottom: 1px solid var(--bd);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 50;
+}
+.logo-mark {
+  width: 30px; height: 30px;
+  background: linear-gradient(135deg, var(--acc), var(--acc2));
+  border-radius: 7px;
+  display: grid; place-items: center;
+  font-size: 14px; flex-shrink: 0;
+}
+.logo-text { font-weight: 700; font-size: 14px; letter-spacing: -.3px; flex: 1; }
+.logo-sub  { font-size: 10px; color: var(--t3); font-family: var(--mono); letter-spacing: .5px; }
+#topbar-right {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--t2);
+}
+#topbar-mode-badge {
+  padding: 3px 8px; border-radius: 20px; font-size: 10px;
+  font-weight: 600; font-family: var(--mono); letter-spacing: .5px;
+}
+.mode-loja  { background: #4f7eff22; color: var(--acc); border: 1px solid #4f7eff44; }
+.mode-admin { background: #00d4aa22; color: var(--acc2); border: 1px solid #00d4aa44; }
+#btn-logout {
+  background: none; border: 1px solid var(--bd);
+  color: var(--t3); padding: 4px 10px; border-radius: var(--r2);
+  cursor: pointer; font-family: var(--sans); font-size: 11px;
+  transition: all .15s;
+}
+#btn-logout:hover { color: var(--red); border-color: var(--red); }
+
+/* ══════════════════════════ SCREEN SYSTEM ══════════════════════════ */
+.screen { display: none; flex: 1; overflow: hidden; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ══════════════════════════ LOGIN ══════════════════════════ */
+#screen-login {
+  align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 0%, #151d38 0%, var(--bg) 65%);
+}
+.login-card {
+  width: 100%; max-width: 360px;
+  padding: 32px 28px;
+  background: var(--s1);
+  border: 1px solid var(--bd);
+  border-radius: var(--r);
+  box-shadow: 0 32px 80px rgba(0,0,0,.6);
+  animation: fadeUp .35s ease;
+}
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(16px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.login-logo {
+  width: 48px; height: 48px;
+  background: linear-gradient(135deg, var(--acc), var(--acc2));
+  border-radius: 12px;
+  display: grid; place-items: center;
+  font-size: 22px; margin: 0 auto 16px;
+}
+.login-card h1 {
+  font-family: var(--serif);
+  font-size: 24px; text-align: center; margin-bottom: 4px;
+}
+.login-card p {
+  font-size: 12px; color: var(--t3);
+  text-align: center; margin-bottom: 28px;
+}
+.tab-switch {
+  display: flex; gap: 4px;
+  background: var(--bg); border-radius: var(--r2); padding: 3px;
+  margin-bottom: 20px;
+}
+.tab-switch button {
+  flex: 1; padding: 7px; border: none; border-radius: 4px;
+  background: transparent; color: var(--t3);
+  cursor: pointer; font-family: var(--sans); font-size: 12px; font-weight: 600;
+  transition: all .2s;
+}
+.tab-switch button.active { background: var(--s2); color: var(--tx); }
+
+.fg { margin-bottom: 14px; }
+.fg label {
+  display: block; font-size: 10px; font-weight: 700;
+  letter-spacing: .8px; text-transform: uppercase;
+  color: var(--t3); margin-bottom: 5px;
+}
+.fg input, .fg select {
+  width: 100%; padding: 10px 12px;
+  background: var(--bg); border: 1px solid var(--bd);
+  border-radius: var(--r2); color: var(--tx);
+  font-family: var(--mono); font-size: 13px; outline: none;
+  transition: border-color .15s;
+}
+.fg input:focus, .fg select:focus { border-color: var(--acc); }
+.fg input::placeholder { color: var(--t3); font-family: var(--sans); font-size: 12px; }
+
+/* PIN keypad */
+.pin-display {
+  display: flex; justify-content: center; gap: 10px; margin-bottom: 18px;
+}
+.pin-dot {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--bd2); transition: background .15s;
+}
+.pin-dot.filled { background: var(--acc); }
+.numpad {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px; margin-bottom: 14px;
+}
+.np {
+  padding: 14px; border: none; border-radius: var(--r2);
+  background: var(--s2); color: var(--tx);
+  font-family: var(--mono); font-size: 18px; font-weight: 500;
+  cursor: pointer; transition: all .12s; text-align: center;
+  min-height: 48px;
+}
+.np:hover  { background: var(--s3); }
+.np:active { background: var(--bd2); transform: scale(.96); }
+.np.del, .np.clr { font-size: 13px; color: var(--t2); }
+
+.btn-primary {
+  width: 100%; padding: 11px;
+  background: var(--acc); border: none; border-radius: var(--r2);
+  color: #fff; font-family: var(--sans); font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+}
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+
+.err-msg {
+  color: var(--red); font-size: 11px;
+  text-align: center; margin-top: 10px; min-height: 16px;
+}
+
+/* ══════════════════════════ APP SHELL ══════════════════════════ */
+#app-shell {
+  display: flex; flex: 1; overflow: hidden;
+}
+
+/* ══════════════════════════ SIDEBAR ══════════════════════════ */
+#sidebar {
+  width: 200px; min-width: 200px;
+  background: var(--s1);
+  border-right: 1px solid var(--bd);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+}
+.nav-group { padding: 10px 8px; }
+.nav-group + .nav-group { border-top: 1px solid var(--bd); }
+.nav-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--t3);
+  padding: 4px 8px 6px;
+}
+.nav-btn {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px; border-radius: var(--r2);
+  border: none; background: none;
+  color: var(--t2); font-family: var(--sans); font-size: 12px;
+  font-weight: 500; cursor: pointer; width: 100%; text-align: left;
+  transition: all .12s;
+}
+.nav-btn:hover  { background: var(--s2); color: var(--tx); }
+.nav-btn.active { background: #4f7eff18; color: var(--acc); }
+.nav-btn .ni    { font-size: 14px; width: 18px; text-align: center; }
+
+/* ══════════════════════════ CONTENT ══════════════════════════ */
+#content {
+  flex: 1; overflow-y: auto; padding: 24px;
+}
+
+/* ══════════════════════════ LOJA SHELL ══════════════════════════ */
+/* Loja view: store selector tabs on top, content below */
+#loja-shell {
+  display: flex; flex-direction: column; flex: 1; overflow: hidden;
+}
+#store-tabs-bar {
+  background: var(--s1);
+  border-bottom: 1px solid var(--bd);
+  display: flex; align-items: center;
+  overflow-x: auto; flex-shrink: 0;
+  scrollbar-width: none; padding: 0 4px;
+  gap: 2px;
+}
+#store-tabs-bar::-webkit-scrollbar { display: none; }
+.store-tab {
+  padding: 0 14px; height: 42px;
+  display: flex; align-items: center; gap: 6px;
+  border: none; background: none;
+  color: var(--t3); font-family: var(--sans); font-size: 12px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: all .15s; flex-shrink: 0;
+  font-family: var(--mono);
+}
+.store-tab:hover  { color: var(--t2); }
+.store-tab.active { color: var(--acc); border-bottom-color: var(--acc); }
+.store-tab .tab-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--bd); flex-shrink: 0;
+}
+.store-tab.tab-done   .tab-dot { background: var(--acc2); }
+.store-tab.tab-partial .tab-dot { background: var(--warn); }
+.store-tab.tab-empty  .tab-dot { background: var(--bd); }
+
+#loja-panel {
+  flex: 1; overflow-y: auto; padding: 20px 24px;
+}
+
+/* ══════════════════════════ LOJA PANEL ══════════════════════════ */
+.store-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  margin-bottom: 18px;
+}
+.store-code-big {
+  font-family: var(--mono); font-size: 28px; font-weight: 500;
+  color: var(--tx); letter-spacing: .5px;
+}
+.date-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--s2); border: 1px solid var(--bd);
+  padding: 4px 10px; border-radius: 20px;
+  font-family: var(--mono); font-size: 11px; color: var(--t2);
+}
+
+/* progress bar */
+.prog-wrap { margin-bottom: 18px; }
+.prog-row {
+  display: flex; justify-content: space-between;
+  font-size: 12px; color: var(--t2); margin-bottom: 6px;
+}
+.prog-bar  { height: 6px; background: var(--bd); border-radius: 3px; overflow: hidden; }
+.prog-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--acc), var(--acc2));
+  transition: width .4s ease;
+}
+
+/* input row */
+.guia-input-card {
+  background: var(--s1); border: 1px solid var(--bd);
+  border-radius: var(--r); padding: 16px; margin-bottom: 16px;
+}
+.guia-row-input { display: flex; gap: 8px; }
+.guia-row-input input {
+  flex: 1; padding: 11px 14px;
+  background: var(--bg); border: 1px solid var(--bd);
+  border-radius: var(--r2); color: var(--tx);
+  font-family: var(--mono); font-size: 15px; outline: none;
+  letter-spacing: .5px; transition: border-color .15s;
+}
+.guia-row-input input:focus { border-color: var(--acc); }
+.guia-row-input input::placeholder { color: var(--t3); font-size: 12px; }
+.btn-confirm {
+  padding: 11px 16px;
+  background: var(--acc2); border: none; border-radius: var(--r2);
+  color: var(--bg); font-family: var(--sans); font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: filter .15s; white-space: nowrap;
+}
+.btn-confirm:hover { filter: brightness(1.1); }
+.feedback {
+  margin-top: 10px; padding: 9px 12px; border-radius: var(--r2);
+  font-size: 12px; font-weight: 500;
+  display: none; align-items: center; gap: 7px;
+}
+.feedback.show { display: flex; animation: fadeIn .2s; }
+.feedback.ok     { background: #00d4aa14; border: 1px solid #00d4aa30; color: var(--acc2); }
+.feedback.bad    { background: #ff4d5e14; border: 1px solid #ff4d5e30; color: var(--red); }
+.feedback.warn   { background: #ffaa0014; border: 1px solid #ffaa0030; color: var(--warn); }
+@keyframes fadeIn { from{opacity:0;transform:translateY(-3px);} to{opacity:1;transform:translateY(0);} }
+
+/* guias list */
+.guias-list { display: flex; flex-direction: column; gap: 6px; }
+.guia-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--s1); border: 1px solid var(--bd);
+  border-radius: var(--r2); transition: all .15s;
+}
+.guia-item.ok      { border-color: #00d4aa30; background: #00d4aa08; }
+.guia-item.pending { border-color: var(--bd); }
+.guia-ref  { font-family: var(--mono); font-size: 13px; letter-spacing: .3px; }
+.guia-meta { font-size: 10px; color: var(--t3); margin-top: 2px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 20px;
+  font-size: 10px; font-weight: 700; font-family: var(--sans);
+  letter-spacing: .3px;
+}
+.b-ok      { background: #00d4aa18; color: var(--acc2); }
+.b-pending { background: var(--s3); color: var(--t3); }
+.b-warn    { background: #ffaa0018; color: var(--warn); }
+.btn-undo {
+  background: none; border: 1px solid var(--bd); color: var(--t3);
+  padding: 3px 8px; border-radius: 4px; cursor: pointer;
+  font-size: 10px; font-family: var(--sans); transition: all .12s;
+  margin-left: 6px;
+}
+.btn-undo:hover { color: var(--red); border-color: var(--red); }
+
+/* empty state */
+.empty {
+  text-align: center; padding: 48px 16px; color: var(--t3);
+}
+.empty .ei { font-size: 36px; margin-bottom: 10px; }
+.empty p   { font-size: 13px; }
+
+/* ══════════════════════════ ADMIN PAGES ══════════════════════════ */
+.page-title { font-family: var(--serif); font-size: 22px; margin-bottom: 2px; }
+.page-sub   { font-size: 12px; color: var(--t3); margin-bottom: 22px; }
+
+.stats-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.stat {
+  background: var(--s1); border: 1px solid var(--bd);
+  border-radius: var(--r); padding: 16px;
+}
+.stat-l { font-size: 9px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--t3); }
+.stat-v { font-size: 26px; font-family: var(--mono); font-weight: 500; margin: 3px 0 1px; }
+.stat-d { font-size: 11px; color: var(--t3); }
+
+.card {
+  background: var(--s1); border: 1px solid var(--bd);
+  border-radius: var(--r); padding: 20px; margin-bottom: 16px;
+}
+.card-title {
+  font-size: 13px; font-weight: 600; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 7px;
+}
+
+/* table */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead th {
+  background: var(--bg); padding: 8px 12px;
+  text-align: left; font-size: 9px; font-weight: 700;
+  letter-spacing: .7px; text-transform: uppercase; color: var(--t3);
+  border-bottom: 1px solid var(--bd);
+}
+tbody td {
+  padding: 9px 12px; border-bottom: 1px solid var(--bd)55;
+  font-family: var(--mono); vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--s2); }
+.td-sans { font-family: var(--sans) !important; }
+
+/* filter row */
+.frow {
+  display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.frow input, .frow select {
+  padding: 7px 10px;
+  background: var(--s2); border: 1px solid var(--bd);
+  border-radius: var(--r2); color: var(--tx);
+  font-family: var(--mono); font-size: 12px; outline: none;
+}
+.frow input:focus, .frow select:focus { border-color: var(--acc); }
+
+/* upload zone */
+.up-zone {
+  border: 2px dashed var(--bd); border-radius: var(--r);
+  padding: 36px; text-align: center; cursor: pointer;
+  transition: all .2s; background: var(--bg);
+}
+.up-zone:hover, .up-zone.drag { border-color: var(--acc); background: #4f7eff0a; }
+.up-zone .ui { font-size: 32px; margin-bottom: 10px; }
+.up-zone p   { font-size: 13px; color: var(--t3); }
+.up-zone strong { color: var(--tx); }
+.up-zone input { display: none; }
+
+/* store chips */
+.chip-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(80px,1fr));
+  gap: 6px;
+}
+.chip {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--s2); border: 1px solid var(--bd);
+  border-radius: var(--r2); cursor: pointer; user-select: none;
+  transition: all .12s;
+}
+.chip.on   { background: #4f7eff14; border-color: #4f7eff55; }
+.chip:hover { border-color: var(--bd2); }
+.chip .cc  { font-family: var(--mono); font-size: 11px; font-weight: 500; }
+.chip .cdot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--bd);
+  transition: background .15s;
+}
+.chip.on .cdot { background: var(--acc); }
+
+.btn-sm {
+  padding: 6px 12px; border-radius: var(--r2);
+  background: var(--s2); border: 1px solid var(--bd);
+  color: var(--t2); font-size: 11px; font-family: var(--sans);
+  cursor: pointer; font-weight: 500; transition: all .12s;
+}
+.btn-sm:hover { border-color: var(--acc); color: var(--acc); }
+
+/* loading overlay */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(13,15,24,.85); z-index: 999;
+  align-items: center; justify-content: center; flex-direction: column; gap: 14px;
+}
+.overlay.show { display: flex; }
+.spin {
+  width: 22px; height: 22px;
+  border: 2px solid var(--bd); border-top-color: var(--acc);
+  border-radius: 50%; animation: spin .65s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.overlay p { color: var(--t2); font-size: 13px; }
+
+/* toast */
+#toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--s2); border: 1px solid var(--bd2);
+  padding: 10px 18px; border-radius: 20px;
+  font-size: 12px; color: var(--t2);
+  opacity: 0; pointer-events: none; transition: opacity .2s;
+  z-index: 900; white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--bd); border-radius: 3px; }
+
+/* mobile */
+@media (max-width: 640px) {
+  #sidebar { display: none; }
+  #content { padding: 14px; }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  #loja-panel { padding: 14px 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- OVERLAY -->
+<div class="overlay" id="ov"><div class="spin"></div><p id="ov-txt">A carregar...</p></div>
+<div id="toast"></div>
+
+<!-- ══════════════════════════════════════════
+     TOPBAR
+══════════════════════════════════════════ -->
+<div id="topbar" style="display:none">
+  <div class="logo-mark">📦</div>
+  <div style="flex:1">
+    <div class="logo-text">Guias de Remessa</div>
+    <div class="logo-sub">ARREIOU</div>
+  </div>
+  <div id="topbar-right">
+    <span id="topbar-mode-badge" class="mode-loja">LOJA</span>
+    <span id="topbar-info"></span>
+    <button id="btn-logout">Sair</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: LOGIN
+══════════════════════════════════════════ -->
+<div class="screen active" id="screen-login">
+  <div class="login-card">
+    <div class="login-logo">📦</div>
+    <h1>Guias de Remessa</h1>
+    <p>Controlo de recepção · Arreiou Supermercados</p>
+
+    <div class="tab-switch">
+      <button class="active" id="tab-loja-btn" onclick="switchTab('loja')">Loja</button>
+      <button id="tab-admin-btn" onclick="switchTab('admin')">Administração</button>
+    </div>
+
+    <!-- LOGIN LOJA: código + PIN numérico -->
+    <div id="login-loja">
+      <div class="fg">
+        <label>Código da loja</label>
+        <input type="text" id="loja-code" placeholder="Ex: A143" maxlength="6"
+          oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="fg">
+        <label>PIN</label>
+        <div class="pin-display" id="pin-dots">
+          <div class="pin-dot" id="pd0"></div>
+          <div class="pin-dot" id="pd1"></div>
+          <div class="pin-dot" id="pd2"></div>
+          <div class="pin-dot" id="pd3"></div>
+        </div>
+        <div class="numpad">
+          <button class="np" onclick="nk('1')">1</button>
+          <button class="np" onclick="nk('2')">2</button>
+          <button class="np" onclick="nk('3')">3</button>
+          <button class="np" onclick="nk('4')">4</button>
+          <button class="np" onclick="nk('5')">5</button>
+          <button class="np" onclick="nk('6')">6</button>
+          <button class="np" onclick="nk('7')">7</button>
+          <button class="np" onclick="nk('8')">8</button>
+          <button class="np" onclick="nk('9')">9</button>
+          <button class="np clr" onclick="nk('C')">Limpar</button>
+          <button class="np" onclick="nk('0')">0</button>
+          <button class="np del" onclick="nk('X')">⌫</button>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="doLojaLogin()">Entrar</button>
+    </div>
+
+    <!-- LOGIN ADMIN -->
+    <div id="login-admin" style="display:none">
+      <div class="fg">
+        <label>PIN de administração</label>
+        <div class="pin-display" id="adm-pin-dots">
+          <div class="pin-dot" id="apd0"></div>
+          <div class="pin-dot" id="apd1"></div>
+          <div class="pin-dot" id="apd2"></div>
+          <div class="pin-dot" id="apd3"></div>
+        </div>
+        <div class="numpad">
+          <button class="np" onclick="ank('1')">1</button>
+          <button class="np" onclick="ank('2')">2</button>
+          <button class="np" onclick="ank('3')">3</button>
+          <button class="np" onclick="ank('4')">4</button>
+          <button class="np" onclick="ank('5')">5</button>
+          <button class="np" onclick="ank('6')">6</button>
+          <button class="np" onclick="ank('7')">7</button>
+          <button class="np" onclick="ank('8')">8</button>
+          <button class="np" onclick="ank('9')">9</button>
+          <button class="np clr" onclick="ank('C')">Limpar</button>
+          <button class="np" onclick="ank('0')">0</button>
+          <button class="np del" onclick="ank('X')">⌫</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="err-msg" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: APP
+══════════════════════════════════════════ -->
+<div class="screen" id="screen-app">
+<div id="app-shell">
+
+  <!-- SIDEBAR (admin) -->
+  <nav id="sidebar" style="display:none">
+    <div class="nav-group">
+      <div class="nav-label">Dashboard</div>
+      <button class="nav-btn active" id="nav-overview" onclick="ap('overview')">
+        <span class="ni">📊</span>Visão Geral
+      </button>
+      <button class="nav-btn" id="nav-detail" onclick="ap('detail')">
+        <span class="ni">🔍</span>Detalhe Lojas
+      </button>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Gestão</div>
+      <button class="nav-btn" id="nav-upload" onclick="ap('upload')">
+        <span class="ni">📤</span>Upload XLSX
+      </button>
+      <button class="nav-btn" id="nav-stores" onclick="ap('stores')">
+        <span class="ni">🏪</span>Lojas Activas
+      </button>
+      <button class="nav-btn" id="nav-pins" onclick="ap('pins')">
+        <span class="ni">🔑</span>PINs
+      </button>
+    </div>
+  </nav>
+
+  <!-- LOJA SHELL (tabs por loja) -->
+  <div id="loja-shell" style="display:none">
+    <div id="store-tabs-bar"></div>
+    <div id="loja-panel"></div>
+  </div>
+
+  <!-- ADMIN CONTENT -->
+  <div id="content" style="display:none">
+
+    <!-- OVERVIEW -->
+    <div id="page-overview" style="display:none">
+      <div class="page-title">Visão Geral</div>
+      <div class="page-sub" id="ov-sub">—</div>
+      <div class="stats-row" id="ov-stats"></div>
+      <div class="card">
+        <div class="card-title">📅 Por data</div>
+        <div id="ov-table"></div>
+      </div>
+    </div>
+
+    <!-- DETAIL -->
+    <div id="page-detail" style="display:none">
+      <div class="page-title">Detalhe por Loja</div>
+      <div class="page-sub">Referências esperadas vs recebidas</div>
+      <div class="frow">
+        <input id="f-store" placeholder="Filtrar loja..." oninput="renderDetail()" style="width:120px">
+        <select id="f-date" onchange="renderDetail()"><option value="">Todas as datas</option></select>
+        <select id="f-status" onchange="renderDetail()">
+          <option value="">Todos</option>
+          <option value="ok">Completo</option>
+          <option value="partial">Parcial</option>
+          <option value="none">Sem resposta</option>
+        </select>
+      </div>
+      <div class="card" style="padding:0">
+        <div class="tbl-wrap">
+          <table><thead>
+            <tr><th>Loja</th><th>Data</th><th>Esperadas</th><th>Confirmadas</th><th>Estado</th></tr>
+          </thead><tbody id="detail-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- UPLOAD -->
+    <div id="page-upload" style="display:none">
+      <div class="page-title">Upload XLSX</div>
+      <div class="page-sub">Importar ficheiro de entradas gerais</div>
+      <div class="card">
+        <div class="card-title">📂 Ficheiro</div>
+        <div class="up-zone" id="up-zone"
+          onclick="document.getElementById('f-xlsx').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="dropFile(event)">
+          <div class="ui">📂</div>
+          <p><strong>Clique para seleccionar</strong> ou arraste o ficheiro</p>
+          <p style="font-size:11px;margin-top:4px">.xlsx — ENTRADAS_GERAIS</p>
+          <input type="file" id="f-xlsx" accept=".xlsx,.xls" onchange="selectFile(event)">
+        </div>
+        <div id="up-preview" style="margin-top:14px"></div>
+        <button class="btn-primary" id="btn-confirm-up"
+          style="display:none;max-width:200px;margin-top:14px" onclick="confirmUpload()">
+          Confirmar importação
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-title">📜 Histórico</div>
+        <div id="up-history"></div>
+      </div>
+    </div>
+
+    <!-- STORES -->
+    <div id="page-stores" style="display:none">
+      <div class="page-title">Lojas Activas</div>
+      <div class="page-sub">Seleccione as lojas que participam no controlo</div>
+      <div class="card">
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+          <input id="chip-filter" placeholder="Filtrar..." oninput="renderChips()"
+            style="padding:6px 10px;background:var(--s2);border:1px solid var(--bd);
+              border-radius:var(--r2);color:var(--tx);font-family:var(--mono);font-size:12px;
+              outline:none;width:120px">
+          <button class="btn-sm" onclick="allChips(1)">Activar todas</button>
+          <button class="btn-sm" onclick="allChips(0)">Desactivar</button>
+          <button class="btn-sm" onclick="chipsFromUpload()">Do último upload</button>
+          <button class="btn-primary" style="max-width:140px;padding:6px 12px;font-size:11px"
+            onclick="saveStores()">💾 Guardar</button>
+        </div>
+        <div class="chip-grid" id="chip-grid"></div>
+      </div>
+    </div>
+
+    <!-- PINS -->
+    <div id="page-pins" style="display:none">
+      <div class="page-title">PINs das Lojas</div>
+      <div class="page-sub">PIN de 4 dígitos por loja (apenas lojas activas)</div>
+      <div class="card">
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          <button class="btn-sm" onclick="genPins()">🎲 Gerar todos</button>
+          <button class="btn-primary" style="max-width:140px;padding:6px 12px;font-size:11px"
+            onclick="savePins()">💾 Guardar PINs</button>
+        </div>
+        <div class="tbl-wrap">
+          <table><thead>
+            <tr><th>Loja</th><th>PIN</th><th></th></tr>
+          </thead><tbody id="pins-tbody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /app-shell -->
+</div><!-- /screen-app -->
+
+<!-- ══════════════════════════════════════════
+     FIREBASE + XLSX + LOGIC
+══════════════════════════════════════════ -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import {
+  getFirestore, doc, getDoc, setDoc, collection, getDocs,
+  addDoc, serverTimestamp, writeBatch
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+/* ─────────────────────────────────────────
+   FIREBASE CONFIG  ← substitua aqui
+───────────────────────────────────────── */
+const FB = {
+  apiKey:            "COLE_API_KEY",
+  authDomain:        "COLE_AUTH_DOMAIN",
+  projectId:         "COLE_PROJECT_ID",
+  storageBucket:     "COLE_STORAGE_BUCKET",
+  messagingSenderId: "COLE_SENDER_ID",
+  appId:             "COLE_APP_ID"
+};
+
+const fapp = initializeApp(FB);
+const db   = getFirestore(fapp);
+
+// expose to global scope
+Object.assign(window, {
+  _db: db,
+  _doc: doc, _getDoc: getDoc, _setDoc: setDoc,
+  _col: collection, _getDocs: getDocs,
+  _addDoc: addDoc, _sts: serverTimestamp, _batch: writeBatch,
+});
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+/* ════════════════ STATE ════════════════ */
+const ADMIN_PIN = '1122';
+const S = {
+  role: null,
+  lojaCode: null,
+  stores: {},
+  active: new Set(),
+  entries: {},
+  received: {},
+  uploads: [],
+  pending: null,
+  currentTab: null,
+  pinBuffer: '',      // loja PIN buffer
+  admBuffer: '',      // admin PIN buffer
+};
+
+/* ════════════════ UTILS ════════════════ */
+const $ = id => document.getElementById(id);
+const ov = (txt='A carregar...') => { $('ov-txt').textContent = txt; $('ov').classList.add('show'); };
+const hov = () => $('ov').classList.remove('show');
+function toast(msg, dur=2800) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), dur);
+}
+const today = () => new Date().toISOString().slice(0,10);
+const fmtTime = ts => {
+  if (!ts) return '';
+  const d = ts instanceof Date ? ts : (ts.toDate ? ts.toDate() : new Date(ts));
+  return d.toTimeString().slice(0,5);
+};
+const genPin = () => String(Math.floor(1000 + Math.random() * 9000));
+
+/* ════════════════ LOGIN TAB ════════════════ */
+function switchTab(t) {
+  $('login-loja').style.display  = t==='loja'  ? '' : 'none';
+  $('login-admin').style.display = t==='admin' ? '' : 'none';
+  $('tab-loja-btn').classList.toggle('active', t==='loja');
+  $('tab-admin-btn').classList.toggle('active', t==='admin');
+  $('login-err').textContent = '';
+  S.pinBuffer = ''; S.admBuffer = '';
+  updateDots(); updateAdmDots();
+}
+
+/* ════════════════ NUMPAD ════════════════ */
+function nk(k) {
+  if (k==='C') { S.pinBuffer = ''; }
+  else if (k==='X') { S.pinBuffer = S.pinBuffer.slice(0,-1); }
+  else if (S.pinBuffer.length < 4) { S.pinBuffer += k; }
+  updateDots();
+  if (S.pinBuffer.length === 4) {
+    // small delay for visual feedback
+    setTimeout(doLojaLogin, 120);
+  }
+}
+function updateDots() {
+  [0,1,2,3].forEach(i => {
+    $(`pd${i}`).classList.toggle('filled', i < S.pinBuffer.length);
+  });
+}
+
+/* ════════════════ ADMIN NUMPAD ════════════════ */
+function ank(k) {
+  if (k==='C') { S.admBuffer = ''; }
+  else if (k==='X') { S.admBuffer = S.admBuffer.slice(0,-1); }
+  else if (S.admBuffer.length < 4) { S.admBuffer += k; }
+  updateAdmDots();
+  if (S.admBuffer.length === 4) setTimeout(doAdminLogin, 120);
+}
+function updateAdmDots() {
+  [0,1,2,3].forEach(i => {
+    $(`apd${i}`)?.classList.toggle('filled', i < S.admBuffer.length);
+  });
+}
+
+/* ════════════════ LOJA LOGIN ════════════════ */
+async function doLojaLogin() {
+  const code = $('loja-code').value.trim().toUpperCase();
+  const pin  = S.pinBuffer;
+  if (!code) { $('login-err').textContent = 'Introduza o código da loja.'; return; }
+  if (pin.length < 4) { $('login-err').textContent = 'Introduza o PIN de 4 dígitos.'; return; }
+  ov('A verificar...');
+  try {
+    const snap = await window._getDoc(window._doc(window._db, 'stores', code));
+    if (!snap.exists()) { hov(); $('login-err').textContent = 'Loja não encontrada.'; S.pinBuffer=''; updateDots(); return; }
+    const d = snap.data();
+    if (!d.active)  { hov(); $('login-err').textContent = 'Esta loja não está activa.'; S.pinBuffer=''; updateDots(); return; }
+    if (d.pin !== pin) { hov(); $('login-err').textContent = 'PIN incorrecto.'; S.pinBuffer=''; updateDots(); return; }
+
+    S.role = 'loja';
+    S.lojaCode = code;
+    await loadLojaData();
+    setupLojaUI();
+    hov();
+  } catch(e) { hov(); console.error(e); $('login-err').textContent = 'Erro de ligação.'; S.pinBuffer=''; updateDots(); }
+}
+
+/* ════════════════ ADMIN LOGIN ════════════════ */
+/* ════════════════ ADMIN LOGIN ════════════════ */
+async function doAdminLogin() {
+  if (S.admBuffer !== ADMIN_PIN) {
+    $('login-err').textContent = 'PIN incorrecto.';
+    S.admBuffer = ''; updateAdmDots(); return;
+  }
+  await loadAdmin();
+}
+
+/* ════════════════ LOGOUT ════════════════ */
+$('btn-logout').addEventListener('click', async () => {
+  Object.assign(S, { role:null, lojaCode:null, stores:{}, active:new Set(),
+    entries:{}, received:{}, uploads:[], pending:null, currentTab:null,
+    pinBuffer:'', admBuffer:'' });
+  $('topbar').style.display = 'none';
+  $('sidebar').style.display = 'none';
+  $('content').style.display = 'none';
+  $('loja-shell').style.display = 'none';
+  setScreen('screen-login');
+  $('loja-code').value = '';
+  updateDots(); updateAdmDots();
+  $('login-err').textContent = '';
+});
+
+function setScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+/* ════════════════ LOAD DATA ════════════════ */
+async function loadLojaData() {
+  const db = window._db;
+  // load only entries for this loja
+  const allEntries = await window._getDocs(window._col(db, 'entries'));
+  S.entries = {};
+  allEntries.forEach(d => {
+    if (d.id.startsWith(S.lojaCode + '_')) S.entries[d.id] = d.data();
+  });
+  // load received for this loja
+  const allRec = await window._getDocs(window._col(db, 'received'));
+  S.received = {};
+  allRec.forEach(d => {
+    if (d.id.startsWith(S.lojaCode + '_')) S.received[d.id] = d.data();
+  });
+}
+
+async function loadAdmin() {
+  ov('A carregar...');
+  const db = window._db;
+  // stores
+  const ss = await window._getDocs(window._col(db, 'stores'));
+  S.stores = {}; S.active = new Set();
+  ss.forEach(d => { S.stores[d.id] = d.data(); if (d.data().active) S.active.add(d.id); });
+  // entries
+  const es = await window._getDocs(window._col(db, 'entries'));
+  S.entries = {};
+  es.forEach(d => S.entries[d.id] = d.data());
+  // received
+  const rs = await window._getDocs(window._col(db, 'received'));
+  S.received = {};
+  rs.forEach(d => S.received[d.id] = d.data());
+  // uploads
+  const us = await window._getDocs(window._col(db, 'uploads'));
+  S.uploads = [];
+  us.forEach(d => S.uploads.push({id:d.id,...d.data()}));
+  S.uploads.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+
+  S.role = 'admin';
+  setupAdminUI();
+  hov();
+}
+
+/* ════════════════ LOJA UI (tab-based) ════════════════ */
+function setupLojaUI() {
+  $('topbar').style.display = 'flex';
+  const badge = $('topbar-mode-badge');
+  badge.className = 'mode-loja'; badge.textContent = 'LOJA';
+  $('topbar-info').textContent = S.lojaCode;
+  $('loja-shell').style.display = 'flex';
+  setScreen('screen-app');
+  renderLojaTabs();
+  if (S.currentTab === null) {
+    const keys = Object.keys(S.entries).filter(k => k.startsWith(S.lojaCode+'_'));
+    S.currentTab = keys[0] || null;
+  }
+  renderLojaPanel();
+}
+
+function renderLojaTabs() {
+  const bar = $('store-tabs-bar');
+  const keys = Object.keys(S.entries)
+    .filter(k => k.startsWith(S.lojaCode+'_'))
+    .sort().reverse(); // latest date first
+
+  if (!keys.length) {
+    bar.innerHTML = '<div style="padding:0 16px;font-size:12px;color:var(--t3);line-height:42px">Sem entradas</div>';
+    return;
+  }
+
+  bar.innerHTML = keys.map(key => {
+    const dt = key.split('_')[1];
+    const refs = S.entries[key]?.refs || [];
+    const rec  = S.received[key] || {};
+    const done = refs.filter(r => rec[r]).length;
+    const cls  = done===refs.length && refs.length ? 'tab-done' : done>0 ? 'tab-partial' : 'tab-empty';
+    const act  = key === S.currentTab ? 'active' : '';
+    return `<button class="store-tab ${cls} ${act}" onclick="switchLojaTab('${key}')">
+      <span class="tab-dot"></span>${dt}
+      <span style="font-size:10px;color:var(--t3);margin-left:3px">(${done}/${refs.length})</span>
+    </button>`;
+  }).join('');
+}
+
+function switchLojaTab(key) {
+  S.currentTab = key;
+  renderLojaTabs();
+  renderLojaPanel();
+}
+
+function renderLojaPanel() {
+  const panel = $('loja-panel');
+  const key   = S.currentTab;
+
+  if (!key) {
+    panel.innerHTML = `<div class="empty"><div class="ei">📭</div><p>Sem guias esperadas.</p></div>`;
+    return;
+  }
+
+  const dt    = key.split('_')[1];
+  const refs  = S.entries[key]?.refs || [];
+  const rec   = S.received[key] || {};
+  const done  = refs.filter(r => rec[r]).length;
+  const pct   = refs.length ? Math.round(done/refs.length*100) : 0;
+
+  panel.innerHTML = `
+    <div class="store-header">
+      <div>
+        <div class="store-code-big">${S.lojaCode}</div>
+      </div>
+      <div class="date-chip">📅 ${dt}</div>
+    </div>
+
+    <div class="prog-wrap">
+      <div class="prog-row">
+        <span>${done} / ${refs.length} guias confirmadas</span>
+        <span style="font-family:var(--mono);color:var(--acc2)">${pct}%</span>
+      </div>
+      <div class="prog-bar"><div class="prog-fill" style="width:${pct}%"></div></div>
+    </div>
+
+    <div class="guia-input-card">
+      <div class="guia-row-input">
+        <input id="guia-inp" placeholder="Nº referência (ex: 0085417838)"
+          onkeydown="if(event.key==='Enter')submitGuia()">
+        <button class="btn-confirm" onclick="submitGuia()">✓ OK</button>
+      </div>
+      <div class="feedback" id="fb"></div>
+    </div>
+
+    <div style="font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+      color:var(--t3);margin-bottom:10px">Guias esperadas</div>
+    <div class="guias-list">
+      ${refs.length ? refs.map(ref => {
+        const ts = rec[ref];
+        const ok = !!ts;
+        return `<div class="guia-item ${ok?'ok':'pending'}" id="gi-${ref}">
+          <div>
+            <div class="guia-ref">${ref}</div>
+            <div class="guia-meta">${ok ? '✓ Recebida às '+fmtTime(ts) : 'Aguarda confirmação'}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            ${ok
+              ? `<span class="badge b-ok">✓ OK</span>
+                 <button class="btn-undo" onclick="undoGuia('${ref}','${key}')">desfazer</button>`
+              : `<span class="badge b-pending">Pendente</span>`}
+          </div>
+        </div>`;
+      }).join('') : '<div class="empty"><div class="ei">📭</div><p>Sem referências para esta data.</p></div>'}
+    </div>`;
+
+  // focus input
+  setTimeout(() => $('guia-inp')?.focus(), 50);
+}
+
+/* ════════════════ GUIA SUBMIT ════════════════ */
+async function submitGuia() {
+  const inp = $('guia-inp');
+  const ref = inp?.value.trim().replace(/\s/g,'');
+  if (!ref) return;
+
+  const key   = S.currentTab;
+  const refs  = S.entries[key]?.refs || [];
+  const rec   = S.received[key] || {};
+  const fb    = $('fb');
+
+  const showFb = (cls, msg) => {
+    fb.className = `feedback ${cls} show`;
+    fb.innerHTML = msg;
+    clearTimeout(fb._t);
+    fb._t = setTimeout(() => fb.classList.remove('show'), 3500);
+  };
+
+  if (!refs.includes(ref)) {
+    showFb('bad', `⚠ Referência <strong>${ref}</strong> não consta nas entradas esperadas para esta data.`);
+    return;
+  }
+  if (rec[ref]) {
+    showFb('warn', `ℹ Referência <strong>${ref}</strong> já confirmada às ${fmtTime(rec[ref])}.`);
+    inp.value = ''; return;
+  }
+
+  const now = new Date();
+  if (!S.received[key]) S.received[key] = {};
+  S.received[key][ref] = now;
+
+  await window._setDoc(window._doc(window._db, 'received', key), S.received[key], {merge:true});
+
+  showFb('ok', `✓ Referência <strong>${ref}</strong> confirmada com sucesso!`);
+  inp.value = '';
+
+  renderLojaTabs();
+  renderLojaPanel();
+}
+
+async function undoGuia(ref, key) {
+  if (!confirm(`Remover confirmação da guia ${ref}?`)) return;
+  if (S.received[key]) {
+    delete S.received[key][ref];
+    await window._setDoc(window._doc(window._db, 'received', key), S.received[key]);
+  }
+  renderLojaTabs();
+  renderLojaPanel();
+}
+
+/* ════════════════ ADMIN UI ════════════════ */
+function setupAdminUI() {
+  $('topbar').style.display = 'flex';
+  const badge = $('topbar-mode-badge');
+  badge.className = 'mode-admin'; badge.textContent = 'ADMIN';
+  $('topbar-info').textContent = 'Administração';
+  $('sidebar').style.display = 'flex';
+  $('content').style.display = 'block';
+  setScreen('screen-app');
+  ap('overview');
+}
+
+function ap(name) {
+  ['overview','detail','upload','stores','pins'].forEach(n => {
+    $(`page-${n}`).style.display = 'none';
+    $(`nav-${n}`)?.classList.remove('active');
+  });
+  $(`page-${name}`).style.display = '';
+  $(`nav-${name}`)?.classList.add('active');
+  if (name==='overview') renderOverview();
+  if (name==='detail')   renderDetail();
+  if (name==='upload')   renderUpHistory();
+  if (name==='stores')   renderChips();
+  if (name==='pins')     renderPins();
+}
+
+/* ── OVERVIEW ── */
+function renderOverview() {
+  const E = S.entries, R = S.received;
+  const dates = [...new Set(Object.values(E).map(v=>v.date))].sort().reverse();
+  let tRefs=0, tRec=0;
+  for (const [k,v] of Object.entries(E)) {
+    tRefs += v.refs.length;
+    const rec = R[k]||{};
+    tRec += v.refs.filter(r=>rec[r]).length;
+  }
+  const stores = new Set(Object.values(E).map(v=>v.centro)).size;
+  $('ov-sub').innerHTML = `<span class="date-chip">📊 ${dates[0]||today()}</span>`;
+  $('ov-stats').innerHTML = `
+    <div class="stat"><div class="stat-l">Lojas</div><div class="stat-v">${stores}</div><div class="stat-d">com entradas</div></div>
+    <div class="stat"><div class="stat-l">Refs esperadas</div><div class="stat-v">${tRefs}</div><div class="stat-d">total</div></div>
+    <div class="stat"><div class="stat-l">Confirmadas</div><div class="stat-v" style="color:var(--acc2)">${tRec}</div><div class="stat-d">${tRefs?Math.round(tRec/tRefs*100):0}%</div></div>
+    <div class="stat"><div class="stat-l">Por confirmar</div><div class="stat-v" style="color:var(--red)">${tRefs-tRec}</div><div class="stat-d">referências</div></div>`;
+
+  if (!dates.length) {
+    $('ov-table').innerHTML = '<div class="empty"><div class="ei">📭</div><p>Sem dados importados</p></div>';
+    return;
+  }
+  $('ov-table').innerHTML = `<div class="tbl-wrap"><table><thead>
+    <tr><th>Data</th><th>Lojas</th><th>Esperadas</th><th>Confirmadas</th><th>%</th><th>Estado</th></tr>
+    </thead><tbody>${dates.map(dt => {
+      const dk = Object.keys(E).filter(k=>k.endsWith('_'+dt));
+      const dR = dk.reduce((s,k)=>s+E[k].refs.length,0);
+      const dC = dk.reduce((s,k)=>{const r=R[k]||{};return s+E[k].refs.filter(x=>r[x]).length;},0);
+      const p  = dR?Math.round(dC/dR*100):0;
+      const bc = p===100?'b-ok':p===0?'b-pending':'b-warn';
+      const bl = p===100?'Completo':p===0?'Sem resposta':`${p}%`;
+      return `<tr>
+        <td>${dt}</td><td class="td-sans">${dk.length}</td>
+        <td>${dR}</td><td style="color:var(--acc2)">${dC}</td>
+        <td style="font-family:var(--mono)">${p}%</td>
+        <td><span class="badge ${bc}">${bl}</span></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+/* ── DETAIL ── */
+function renderDetail() {
+  const fS = ($('f-store')?.value||'').toUpperCase();
+  const fD = $('f-date')?.value||'';
+  const fSt= $('f-status')?.value||'';
+  // populate date options
+  const dSel = $('f-date');
+  if (dSel && dSel.options.length<=1) {
+    const dates = [...new Set(Object.values(S.entries).map(v=>v.date))].sort();
+    dates.forEach(dt => { const o=document.createElement('option');o.value=dt;o.textContent=dt;dSel.appendChild(o); });
+  }
+  let rows = Object.entries(S.entries).map(([key,val]) => {
+    const rec  = S.received[key]||{};
+    const done = val.refs.filter(r=>rec[r]).length;
+    const tot  = val.refs.length;
+    const st   = done===tot&&tot?'ok':done===0?'none':'partial';
+    return {key,centro:val.centro,date:val.date,tot,done,st};
+  });
+  if (fS)  rows = rows.filter(r=>r.centro.includes(fS));
+  if (fD)  rows = rows.filter(r=>r.date===fD);
+  if (fSt) rows = rows.filter(r=>r.st===fSt);
+  rows.sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:a.centro.localeCompare(b.centro));
+  const tb = $('detail-tbody');
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:28px">Sem resultados</td></tr>`;
+    return;
+  }
+  tb.innerHTML = rows.map(r => {
+    const p  = r.tot?Math.round(r.done/r.tot*100):0;
+    const bc = r.st==='ok'?'b-ok':r.st==='none'?'b-pending':'b-warn';
+    const bl = r.st==='ok'?'✓ Completo':r.st==='none'?'Sem resposta':`${p}% (${r.done}/${r.tot})`;
+    return `<tr>
+      <td><strong>${r.centro}</strong></td><td>${r.date}</td>
+      <td>${r.tot}</td><td style="color:var(--acc2)">${r.done}</td>
+      <td><span class="badge ${bc}">${bl}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── UPLOAD ── */
+function dropFile(e) {
+  e.preventDefault(); $('up-zone').classList.remove('drag');
+  const f = e.dataTransfer.files[0]; if (f) parseXLSX(f);
+}
+function selectFile(e) { const f=e.target.files[0]; if (f) parseXLSX(f); }
+
+function parseXLSX(file) {
+  ov('A processar XLSX...');
+  const rd = new FileReader();
+  rd.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'binary', cellDates:true});
+      const sn = wb.SheetNames.includes('Sheet1') ? 'Sheet1' : wb.SheetNames[0];
+      const ws = wb.Sheets[sn];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+      // find header
+      let hi = -1;
+      for (let i=0;i<Math.min(rows.length,10);i++) {
+        const r = rows[i].map(c=>String(c||'').toLowerCase());
+        if (r.some(c=>c.includes('centro')) && r.some(c=>c.includes('refer'))) { hi=i; break; }
+      }
+      if (hi<0) { hov(); showUpPreview(null,'Formato inválido — colunas não encontradas.'); return; }
+      const H = rows[hi].map(c=>String(c||'').toLowerCase());
+      const iC=H.findIndex(h=>h.includes('centro'));
+      const iD=H.findIndex(h=>h.includes('data'));
+      const iR=H.findIndex(h=>h.includes('refer'));
+      const seen=new Set(), parsed={};
+      for (let i=hi+1;i<rows.length;i++) {
+        const row=rows[i];
+        const c=row[iC]?String(row[iC]).trim().toUpperCase():null;
+        const r=row[iR]?String(row[iR]).trim():null;
+        let   d=row[iD];
+        if (!c||!r) continue;
+        if (d instanceof Date) d=d.toISOString().slice(0,10);
+        else if (typeof d==='number') {
+          const pd=XLSX.SSF.parse_date_code(d);
+          d=`${pd.y}-${String(pd.m).padStart(2,'0')}-${String(pd.d).padStart(2,'0')}`;
+        } else d=today();
+        const key=`${c}_${d}`, combo=key+'_'+r;
+        if (seen.has(combo)) continue; seen.add(combo);
+        if (!parsed[key]) parsed[key]={centro:c,date:d,refs:new Set()};
+        parsed[key].refs.add(r);
+      }
+      const result={};
+      let tR=0;const tS=new Set();
+      for (const [k,v] of Object.entries(parsed)) {
+        result[k]={centro:v.centro,date:v.date,refs:[...v.refs]};
+        tR+=v.refs.size; tS.add(v.centro);
+      }
+      S.pending={data:result,filename:file.name,tR,tS:[...tS]};
+      hov(); showUpPreview(result,null,file.name,tR,[...tS]);
+    } catch(err) { hov(); showUpPreview(null,'Erro: '+err.message); }
+  };
+  rd.readAsBinaryString(file);
+}
+
+function showUpPreview(data, err, fn, tR, stores) {
+  const prev = $('up-preview'), btn = $('btn-confirm-up');
+  if (err) {
+    prev.innerHTML = `<div style="color:var(--red);font-size:12px;padding:10px;
+      background:#ff4d5e12;border:1px solid #ff4d5e30;border-radius:var(--r2)">${err}</div>`;
+    btn.style.display='none'; return;
+  }
+  const dates=[...new Set(Object.values(data).map(v=>v.date))].sort();
+  prev.innerHTML = `<div style="background:var(--bg);border:1px solid var(--bd);
+    border-radius:var(--r2);padding:14px;font-size:12px">
+    <strong style="font-family:var(--mono)">${fn}</strong><br>
+    <div style="display:flex;gap:20px;margin-top:8px">
+      <div><div style="color:var(--t3);font-size:10px">LOJAS</div><div style="font-size:20px;font-family:var(--mono)">${stores.length}</div></div>
+      <div><div style="color:var(--t3);font-size:10px">REFS</div><div style="font-size:20px;font-family:var(--mono)">${tR}</div></div>
+      <div><div style="color:var(--t3);font-size:10px">DATAS</div><div style="font-size:20px;font-family:var(--mono)">${dates.length}</div></div>
+    </div>
+    <div style="color:var(--t3);margin-top:6px">${dates.join(' · ')}</div>
+  </div>`;
+  btn.style.display='inline-block';
+}
+
+async function confirmUpload() {
+  if (!S.pending) return;
+  ov('A importar...');
+  const db=window._db, bt=window._batch(db);
+  for (const [key,val] of Object.entries(S.pending.data)) {
+    bt.set(window._doc(db,'entries',key),{centro:val.centro,date:val.date,refs:val.refs});
+  }
+  await bt.commit();
+  await window._addDoc(window._col(db,'uploads'),{
+    filename:S.pending.filename,totalRefs:S.pending.tR,
+    totalStores:S.pending.tS.length,createdAt:window._sts(),
+    uploadedBy: 'admin'
+  });
+  // refresh local
+  const es=await window._getDocs(window._col(db,'entries'));
+  S.entries={};
+  es.forEach(d=>S.entries[d.id]=d.data());
+  const us=await window._getDocs(window._col(db,'uploads'));
+  S.uploads=[];
+  us.forEach(d=>S.uploads.push({id:d.id,...d.data()}));
+  S.uploads.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
+  S.pending=null;
+  $('btn-confirm-up').style.display='none';
+  $('up-preview').innerHTML=`<div style="color:var(--acc2);font-size:12px;padding:10px;
+    background:#00d4aa12;border:1px solid #00d4aa30;border-radius:var(--r2)">
+    ✓ Importação concluída.</div>`;
+  renderUpHistory();
+  hov();
+}
+
+function renderUpHistory() {
+  const c=$('up-history');
+  if (!S.uploads.length) {
+    c.innerHTML='<div class="empty"><div class="ei">📭</div><p>Sem uploads</p></div>'; return;
+  }
+  c.innerHTML=`<div class="tbl-wrap"><table><thead>
+    <tr><th>Ficheiro</th><th>Data</th><th>Lojas</th><th>Refs</th><th>Por</th></tr>
+    </thead><tbody>${S.uploads.slice(0,10).map(u=>{
+      const dt=u.createdAt?.toDate?.()?.toLocaleString('pt-PT')||'—';
+      return `<tr>
+        <td class="td-sans">${u.filename||'—'}</td><td>${dt}</td>
+        <td>${u.totalStores||'—'}</td><td>${u.totalRefs||'—'}</td>
+        <td style="color:var(--t3);font-size:11px">${u.uploadedBy||'—'}</td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+/* ── STORES ── */
+function renderChips() {
+  const f=($('chip-filter')?.value||'').toUpperCase();
+  const all=Object.keys(S.stores).sort();
+  const fl=f?all.filter(c=>c.includes(f)):all;
+  if (!fl.length) { $('chip-grid').innerHTML='<div style="color:var(--t3);font-size:12px">Sem lojas</div>'; return; }
+  $('chip-grid').innerHTML=fl.map(code=>`
+    <div class="chip ${S.active.has(code)?'on':''}" id="ch-${code}" onclick="toggleChip('${code}')">
+      <span class="cc">${code}</span><span class="cdot"></span>
+    </div>`).join('');
+}
+function toggleChip(code) {
+  S.active.has(code)?S.active.delete(code):S.active.add(code);
+  const ch=$(`ch-${code}`);
+  if (ch) { ch.classList.toggle('on',S.active.has(code)); ch.querySelector('.cdot').style.background=S.active.has(code)?'var(--acc)':''; }
+}
+function allChips(v) { const all=Object.keys(S.stores); if(v) all.forEach(c=>S.active.add(c)); else S.active.clear(); renderChips(); }
+function chipsFromUpload() {
+  Object.values(S.entries).forEach(v=>S.active.add(v.centro));
+  renderChips();
+}
+async function saveStores() {
+  ov('A guardar...');
+  const db=window._db, bt=window._batch(db);
+  const all=new Set([...Object.keys(S.stores),...S.active]);
+  for (const code of all) {
+    const ex=S.stores[code]||{};
+    bt.set(window._doc(db,'stores',code),{...ex,active:S.active.has(code)},{merge:true});
+  }
+  await bt.commit();
+  const ss=await window._getDocs(window._col(db,'stores'));
+  S.stores={}; S.active=new Set();
+  ss.forEach(d=>{S.stores[d.id]=d.data();if(d.data().active)S.active.add(d.id);});
+  hov(); toast('Lojas guardadas!');
+}
+
+/* ── PINS ── */
+function renderPins() {
+  const arr=[...S.active].sort();
+  if (!arr.length) {
+    $('pins-tbody').innerHTML=`<tr><td colspan="3" style="text-align:center;color:var(--t3);padding:24px">Nenhuma loja activa.</td></tr>`;
+    return;
+  }
+  $('pins-tbody').innerHTML=arr.map(code=>{
+    const pin=S.stores[code]?.pin||'';
+    return `<tr>
+      <td><strong>${code}</strong></td>
+      <td><input type="text" value="${pin}" maxlength="4" id="pi-${code}"
+        oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+        style="width:70px;padding:5px 8px;background:var(--bg);border:1px solid var(--bd);
+          border-radius:4px;color:var(--tx);font-family:var(--mono);font-size:15px;
+          letter-spacing:4px;outline:none;text-align:center"></td>
+      <td><button class="btn-sm" onclick="cpPin('${code}')">📋</button></td>
+    </tr>`;
+  }).join('');
+}
+function genPins() {
+  [...S.active].sort().forEach(code=>{const el=$(`pi-${code}`);if(el)el.value=genPin();});
+}
+function cpPin(code) {
+  const el=$(`pi-${code}`);
+  if (el) navigator.clipboard.writeText(el.value).then(()=>{toast('PIN copiado!');});
+}
+async function savePins() {
+  ov('A guardar PINs...');
+  const db=window._db, bt=window._batch(db);
+  for (const code of S.active) {
+    const el=$(`pi-${code}`); const pin=el?.value.trim();
+    if (!pin||pin.length!==4) continue;
+    bt.set(window._doc(db,'stores',code),{pin},{merge:true});
+    if (!S.stores[code]) S.stores[code]={};
+    S.stores[code].pin=pin;
+  }
+  await bt.commit(); hov(); toast('PINs guardados!');
+}
+
+/* ════════════════ KEYBOARD SUPPORT ════════════════ */
+document.addEventListener('keydown', e => {
+  // Only active on login screen
+  if (!document.getElementById('screen-login').classList.contains('active')) return;
+
+  const lojaActive  = document.getElementById('login-loja').style.display  !== 'none';
+  const adminActive = document.getElementById('login-admin').style.display !== 'none';
+
+  // Don't intercept if user is typing in the store code input
+  if (document.activeElement === document.getElementById('loja-code')) return;
+
+  if (e.key >= '0' && e.key <= '9') {
+    if (lojaActive)  nk(e.key);
+    if (adminActive) ank(e.key);
+  } else if (e.key === 'Backspace') {
+    if (lojaActive)  nk('X');
+    if (adminActive) ank('X');
+  } else if (e.key === 'Escape' || e.key === 'Delete') {
+    if (lojaActive)  nk('C');
+    if (adminActive) ank('C');
+  }
+});
+
+/* ════════════════ EXPOSE GLOBALS ════════════════ */
+Object.assign(window, {
+  switchTab, nk, ank, doLojaLogin, doAdminLogin,
+  switchLojaTab, submitGuia, undoGuia,
+  ap, renderDetail, renderChips, toggleChip,
+  allChips, chipsFromUpload, saveStores,
+  renderPins, genPins, cpPin, savePins,
+  dropFile, selectFile, confirmUpload,
+  genPin
+});
+</script>
+</body>
+</html>
