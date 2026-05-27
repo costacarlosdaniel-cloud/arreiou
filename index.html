@@ -726,7 +726,9 @@ async function listDriveImages() {
 }
 
 async function downloadDriveImage(fileId) {
-  const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${GDRIVE_API_KEY}`;
+  // URL público — requer pasta partilhada como "Qualquer pessoa com o link"
+  // Sem restrições CORS ao contrário da API autenticada
+  const url = `https://drive.google.com/uc?export=download&id=${fileId}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Download falhou: ${res.status}`);
   return res.arrayBuffer();
