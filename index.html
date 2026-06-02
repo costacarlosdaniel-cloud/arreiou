@@ -690,8 +690,8 @@ window.fbWriteInv=async function(date,loja,turno,entry){
   }
 };
 window.fbLoadInv=async function(dias){try{dias=dias||90;var since=new Date();since.setDate(since.getDate()-dias);var s0=since.toISOString().split('T')[0];var o={};const snapAll=await getDocs(collection(db,'inventory_counts'));snapAll.forEach(function(d){var dd=d.data(),dt=dd.data||dd.key&&dd.key.split('__')[0]||'',lj=dd.loja||'',t=dd.turno||'';if(!dt||!lj||!t)return;if(dt<s0)return;var v=JSON.parse(JSON.stringify(dd.value||{}).replace(/_D_/g,'.'));if(!o[dt])o[dt]={};if(!o[dt][lj])o[dt][lj]={};o[dt][lj][t]=v;});console.log('[fbLoadInv] docs:',snapAll.size,'dates in range:',Object.keys(o).length);return o;}catch(e){console.error('[fbLoadInv]',e);return{};}};
-window.fbLoadContCfg=async function(){try{const d=await getDoc(doc(db,'appData','arreiou_cont_cfg_v1'));if(d.exists()){var v=d.data().value;return typeof v==='string'?JSON.parse(v):v;}}catch(e){}return null;};
-window.fbWriteContCfg=async function(cfg){try{await setDoc(doc(db,'appData','arreiou_cont_cfg_v1'),{value:cfg,updatedAt:serverTimestamp()});}catch(e){console.warn('[FB]cfg write',e);}};
+window.fbLoadContCfg=async function(){try{var d=await getDoc(doc(db,'appData','arreiou_cont_cfg_v1'));if(d.exists()){var v=d.data().value;var r=typeof v==='string'?JSON.parse(v):v;if(r&&r.artigos&&r.artigos.length){console.log('[fbLoadContCfg] artigos:',r.artigos.length);return r;}}}catch(e){console.warn('[fbLoadContCfg]',e);}return null;};
+window.fbWriteContCfg=async function(cfg){try{await setDoc(doc(db,'appData','cont_cfg'),{value:cfg,updatedAt:serverTimestamp()});}catch(e){console.warn('[FB]cfg write',e);}};
 window.fbLoadAdmCfg=async function(){try{const d=await getDoc(doc(db,'appData','adm_obj'));if(d.exists()){var v=d.data().value;return typeof v==='string'?JSON.parse(v):v;}}catch(e){}return null;};
 window.fbLoadLojasCfg=async function(){try{const d=await getDoc(doc(db,'appData','arreiou_lojas_cfg_v1'));if(d.exists()){var v=d.data().value;return typeof v==='string'?JSON.parse(v):v;}}catch(e){}return null;};
 window.fbWriteUnif=async function(code,val){try{await setDoc(doc(db,'cash_unifications',sid(code)),{loja:code,value:val,updatedAt:serverTimestamp()});}catch(e){console.warn('[FB]unif write',e);}};
@@ -880,7 +880,10 @@ async function boot(){
   // 5. Contagens
   var lsCfg=localStorage.getItem(CONT_CFG_KEY);
   if(lsCfg){try{_CFG=JSON.parse(lsCfg);}catch(e){}}
-  else{var fb=await fbLoadContCfg();if(fb){_CFG=fb;lsSaveCfg();}}
+  // Sempre sincronizar do Firebase para ter artigos actualizados
+  var fbCfg=await fbLoadContCfg();
+  if(fbCfg&&fbCfg.artigos&&fbCfg.artigos.length){_CFG=fbCfg;lsSaveCfg();}
+  else if(!lsCfg){var fb2cfg=await fbLoadContCfg();if(fb2cfg){_CFG=fb2cfg;lsSaveCfg();}}
   if(!_CFG.artigos)_CFG.artigos=[];
 
   var lsDat=localStorage.getItem(CONT_DATA_KEY);
