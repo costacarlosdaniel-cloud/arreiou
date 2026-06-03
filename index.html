@@ -820,14 +820,6 @@ async function boot(){
   document.getElementById('nav-date').textContent=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d.getDay()]+', '+pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear();
   _contTurno=d.getHours()<14?'manha':d.getHours()<21?'tarde':'noite';
 
-  // 0a. Testar escrita Firebase
-  try{
-    await setDoc(doc(db,'_test','write_test'),{t:Date.now(),updatedAt:serverTimestamp()});
-    console.log('[Firebase] escrita OK');
-  }catch(e){
-    console.error('[Firebase] escrita FALHOU:',e);
-    setTimeout(function(){toast('⚠ Firebase sem permissão de escrita ('+e.code+'). Verifica as Security Rules.');},2000);
-  }
   // 0. Carregar config de abas do Firebase (PINs persistentes)
   try{
     if(window.fbLoadAbasCfg){
@@ -889,7 +881,7 @@ async function boot(){
   var lsDat=localStorage.getItem(CONT_DATA_KEY);
   if(lsDat){try{_DATA=JSON.parse(lsDat);}catch(e){}}
   var fb2=await fbLoadInv(90);
-  if(fb2&&Object.keys(fb2).length){mergeData(fb2);lsSaveDat();console.log('[init] _DATA dates:',Object.keys(_DATA).length);_fixArtIds();window._artNameMap=null;buildArtNameMap();}
+  if(fb2&&Object.keys(fb2).length){mergeData(fb2);lsSaveDat();console.log('[init] _DATA dates:',Object.keys(_DATA).length);_fixArtIds();repairArtIds();window._artNameMap=null;buildArtNameMap();}
   else{console.warn('[init] fbLoadInv returned empty');}
 
   // 6. Caixa
@@ -1006,6 +998,12 @@ function artsForLoja(loja){return(_CFG.artigos||[]).filter(function(a){return a.
 // e ordena ambos por timestamp para fazer correspondência
 function repairArtIds(){
   var cfgArts=(_CFG.artigos||[]);
+  // First try SKU-based matching — most reliable
+  var skuMap={};
+  Object.keys(_DATA||{}).forEach(function(d){Object.keys(_DATA[d]||{}).forEach(function(l){Object.keys(_DATA[d][l]||{}).forEach(function(t){var e=_DATA[d][l][t]||{};Object.keys(e).forEach(function(k){if(k.startsWith('art_')&&e[k]&&e[k].sku){skuMap[e[k].sku]=k;}});});});});
+  var skuFixed=false;
+  cfgArts.forEach(function(a){if(a.sku&&skuMap[a.sku]&&skuMap[a.sku]!==a.id){console.log('[repairArtIds] SKU match:',a.sku,a.id,'->',skuMap[a.sku]);a.id=skuMap[a.sku];skuFixed=true;}});
+  if(skuFixed){lsSaveCfg();if(window.fbWriteContCfg)fbWriteContCfg(_CFG);window._artNameMap=null;buildArtNameMap();console.log('[repairArtIds] SKU fix applied');return;}
   if(!cfgArts.length)return;
   // Collect all unique art_ keys from _DATA
   var dataKeys={};
@@ -1180,7 +1178,7 @@ function autoMatchArtIds(){
     console.log('[autoMatchArtIds] CFG art IDs updated to match data keys');
   }
 }
-function toast(m,dur){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},dur||2400);}
+function toast(m,dur){var t=document.getElementById('toast');if(!t)return;t.textContent=m;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},dur||2400);}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EMPLOYEES — lookup por nº colaborador (HeadcountReport2025)
@@ -4745,6 +4743,15 @@ function msRender(){
   var supMap={};_LOJAS.forEach(function(l){supMap[l.c]=_fdSupMap[l.c]||l.s||'';});
   var dates=Object.keys(_DATA).filter(msDatesOk).sort();
   var lojas=(fLoja?_LOJAS.filter(function(l){return l.c===fLoja;}):_LOJAS).filter(function(l){return!fSup||(supMap[l.c]===fSup);});
+  console.log('[msRender] artsF:',artsF.length,'dates:',dates.length,'lojas:',lojas.length);
+  if(dates.length&&lojas.length){
+    // Sample first date/loja to debug
+    var sd=dates[0];var sl=lojas[0];
+    var sld=(_DATA[sd]||{})[sl?sl.c:''];
+    console.log('[msRender] sample date:',sd,'loja:',sl?sl.c:'?','data keys:',sld?Object.keys(sld):null);
+    if(sld){var st=Object.keys(sld)[0];console.log('[msRender] turno:',st,'art keys:',Object.keys(sld[st]||{}).slice(0,3));}
+    console.log('[msRender] artsF[0].id:',artsF[0]?artsF[0].id:'none');
+  }
   if(!artsF.length){tbl.innerHTML='<div style="padding:20px;text-align:center;color:var(--t3);font-size:14px">Nenhum artigo configurado para contagem.</div>';if(top)top.style.display='none';return;}
   if(!dates.length){tbl.innerHTML='<div style="padding:20px;text-align:center;color:var(--t3);font-size:14px">Sem dados para o período seleccionado.</div>';if(top)top.style.display='none';return;}
   var lojaAbs={};var tbody='';
@@ -4753,7 +4760,10 @@ function msRender(){
   dates.forEach(function(d){lojas.forEach(function(lj){
     var ld=(_DATA[d]||{})[lj.c];if(!ld)return;
     var diffs=artsF.map(function(a){return msDiff(ld,a.id);});
-    if(!diffs.some(function(v){return v!==null;}))return;
+    // Mostrar só se pelo menos 1 artigo da cfg tem qtd contada
+    var hasAnyQty=false;
+    TURNOS.forEach(function(t){var td=ld[t.id]||{};artsF.forEach(function(a){var av=td[a.id];if(av&&typeof av==='object'&&av.qtd!=null)hasAnyQty=true;});});
+    if(!hasAnyQty)return;
     var tot=diffs.reduce(function(s,v){return v!=null?s+v:s;},0);
     var abs=diffs.reduce(function(s,v){return v!=null?s+Math.abs(v):s;},0);
     if(!lojaAbs[lj.c])lojaAbs[lj.c]={n:lj.n,c:lj.c,abs:0,tot:0};
